@@ -1,0 +1,4 @@
+export enum InvoiceTypes {
+  PLANS_INVOICE = 'PLANS_INVOICE',
+  ITEMS_INVOICE = 'ITEMS_INVOICE'
+}
