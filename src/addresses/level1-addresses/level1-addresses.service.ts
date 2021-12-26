@@ -1,4 +1,81 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { UsersService } from 'src/users/users.service';
+import { Repository } from 'typeorm';
+import { StoreLevel1Address } from './dtos/create-level1-address.dto';
+import { UpdateLevel1AddressDTO } from './dtos/update-level1-address.dto';
+import { Level1Address } from './level1-address.entity';
 
 @Injectable()
-export class Level1AddressesService {}
+export class Level1AddressesService {
+  constructor(
+    @InjectRepository(Level1Address)
+    private level1AddressRepository: Repository<Level1Address>,
+    private usersService: UsersService,
+  ) {}
+
+  async findAll(requesterId: string, relations?: string[]) {
+    const user = await this.usersService.findUserByIdOrFail(requesterId);
+
+    if (user.isSuperAdmin) {
+      return this.level1AddressRepository.find();
+    } else {
+      return this.level1AddressRepository.find({
+        where: {
+          company_id: user.company_id,
+        },
+        relations: relations,
+      });
+    }
+  }
+
+  async store(data: StoreLevel1Address, companyId: string) {
+    return await this.level1AddressRepository
+      .save({ ...data, company_id: companyId })
+      .catch((err) => {
+        console.log(err);
+        throw new BadRequestException(err);
+      });
+  }
+
+  async findByIdOrFail(id: string, relations?: string[]) {
+    return await this.level1AddressRepository
+      .findOneOrFail(id, {
+        relations: relations,
+      })
+      .catch((err) => {
+        throw new BadRequestException('Address not found');
+      });
+  }
+
+  async update(id: string, data: UpdateLevel1AddressDTO, requesterId: string) {
+    let address = await this.findByIdOrFail(id);
+    const user = await this.usersService.findByIdOrFail(requesterId);
+    if (address.company_id != user.company_id)
+      throw new HttpException(
+        "You don't have permission to perform this action",
+        HttpStatus.FORBIDDEN,
+      );
+    return await this.level1AddressRepository.update(id, data);
+  }
+
+  async delete(id: string, requesterId: string) {
+    const user = await this.usersService.findByIdOrFail(requesterId);
+    const address = await this.findByIdOrFail(id);
+
+    if (user.company_id != address.company_id)
+      throw new HttpException(
+        "You don't have permission to perform this action",
+        HttpStatus.FORBIDDEN,
+      );
+
+    return await this.level1AddressRepository.delete(id).catch((err) => {
+      throw new BadRequestException('Cannot delete address, address might be linked to some users');
+    });
+  }
+}

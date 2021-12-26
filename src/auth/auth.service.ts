@@ -21,8 +21,9 @@ export class AuthService {
     @InjectRepository(User) private usersRepository: Repository<User>,
   ) {}
   async login(data: LoginDTO) {
-    let user = await this.usersService.findByUsernameOrFail(data.username);
-
+    let user = await this.usersService.findByUsernameOrFail(data.username, [
+      'company',
+    ]);    
     const match = await bcrypt.compare(data.password, user.password);
     if (!match) throw new BadRequestException('Password incorrect!');
 

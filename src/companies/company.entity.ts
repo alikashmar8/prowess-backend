@@ -1,4 +1,9 @@
-import { AddressesEnum } from 'src/addresses/enums/addresses.enum';
+import { AddressesLevel } from 'src/addresses/enums/addresses.enum';
+import { Level1Address } from 'src/addresses/level1-addresses/level1-address.entity';
+import { Level2Address } from 'src/addresses/level2-addresses/level2-address.entity';
+import { Level3Address } from 'src/addresses/level3-addresses/level3-address.entity';
+import { Level4Address } from 'src/addresses/level4-addresses/level4-address.entity';
+import { Level5Address } from 'src/addresses/level5-addresses/level5-address.entity';
 import { Plan } from 'src/plans/plan.entity';
 import { User } from 'src/users/user.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
@@ -25,8 +30,27 @@ export class Company extends BaseEntity {
   @Column({ default: 1, nullable: true })
   maxCustomersNumber: number;
 
-  @Column({ type: 'enum', enum: AddressesEnum, default: AddressesEnum.CITY })
-  maxLocationToEnter: AddressesEnum;
+  @Column({
+    type: 'enum',
+    enum: AddressesLevel,
+    default: AddressesLevel.LEVEL3,
+  })
+  maxLocationLevel: AddressesLevel;
+
+  @Column({ nullable: true })
+  addressLevel1Name: string;
+
+  @Column({ nullable: true })
+  addressLevel2Name: string;
+
+  @Column({ nullable: true })
+  addressLevel3Name: string;
+
+  @Column({ nullable: true })
+  addressLevel4Name: string;
+
+  @Column({ nullable: true })
+  addressLevel5Name: string;
 
   @Column({ nullable: true })
   createdBy_id?: string;
@@ -55,4 +79,19 @@ export class Company extends BaseEntity {
 
   @OneToMany((type) => User, (user) => user.company)
   users: User[];
+
+  @OneToMany((type) => Level1Address, (address) => address.company)
+  level1Addresses: Level1Address[];
+
+  @OneToMany((type) => Level2Address, (address) => address.company)
+  level2Addresses: Level2Address[];
+
+  @OneToMany((type) => Level3Address, (address) => address.company)
+  level3Addresses: Level3Address[];
+
+  @OneToMany((type) => Level4Address, (address) => address.company)
+  level4Addresses: Level4Address[];
+
+  @OneToMany((type) => Level5Address, (address) => address.company)
+  level5Addresses: Level5Address[];
 }

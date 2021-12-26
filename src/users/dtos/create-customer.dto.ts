@@ -18,10 +18,8 @@ export class CreateCustomerDTO {
     phoneNumber?: string;
 
     @ApiProperty()
-    @IsNotEmptyObject()
-    @ValidateNested()
-    @Type(() => CreateAddressDTO)
-    address: CreateAddressDTO
+    @IsOptional()
+    address_id?: string
 
     @ApiProperty()
     @IsOptional()

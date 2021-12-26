@@ -1,6 +1,5 @@
 import * as bcrypt from 'bcrypt';
 import { Exclude } from 'class-transformer';
-import { Address } from 'src/addresses/address.entity';
 import { BCRYPT_SALT } from 'src/common/constants';
 import { BaseEntity } from 'src/common/entities/baseEntity';
 import { removeSpecialCharacters } from 'src/common/utils/functions';
@@ -16,8 +15,9 @@ import {
   ManyToMany,
   ManyToOne,
   OneToMany,
-  OneToOne,
+  OneToOne
 } from 'typeorm';
+import { Level1Address } from './../addresses/level1-addresses/level1-address.entity';
 import { UserRoles } from './enums/user-roles.enum';
 
 @Entity('users')
@@ -67,12 +67,11 @@ export class User extends BaseEntity {
   @JoinColumn({ name: 'company_id' })
   company: Company;
 
-  @OneToOne((type) => Address, (address) => address.user, {
+  @ManyToOne((type) => Level1Address, (address) => address.users, {
     nullable: true,
-    cascade: ['insert', 'update'],
   })
   @JoinColumn({ name: 'address_id' })
-  address: Address;
+  address: Level1Address;
 
   @OneToOne((type) => User, (user) => user.customers, {
     onDelete: 'CASCADE',

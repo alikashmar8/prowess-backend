@@ -25,6 +25,6 @@ export class Address extends BaseEntity {
   @Column({ nullable: true })
   notes?: string;
 
-  @OneToOne((type) => User, (user) => user.address)
-  user: User;
+  // @OneToOne((type) => User, (user) => user.address)
+  // user: User;
 }

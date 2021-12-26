@@ -1,6 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsNumber, IsNumberString, IsString } from 'class-validator';
-import { AddressesEnum } from 'src/addresses/enums/addresses.enum';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsNumberString,
+  IsOptional,
+  IsString,
+} from 'class-validator';
+import { AddressesLevel } from 'src/addresses/enums/addresses.enum';
 
 export class AdminUpdateCompanyDTO {
   @ApiProperty({ required: true, nullable: false })
@@ -34,7 +41,22 @@ export class AdminUpdateCompanyDTO {
   maxCustomersNumber: number;
 
   @IsNotEmpty()
-  @IsEnum(AddressesEnum)
-  @ApiProperty({ enum: AddressesEnum })
-  maxLocationToEnter: AddressesEnum;
+  @IsEnum(AddressesLevel)
+  @ApiProperty({ enum: AddressesLevel })
+  maxLocationLevel: AddressesLevel;
+
+  @IsNotEmpty()
+  addressLevel1Name: string;
+
+  @IsOptional()
+  addressLevel2Name: string;
+
+  @IsOptional()
+  addressLevel3Name: string;
+
+  @IsOptional()
+  addressLevel4Name: string;
+
+  @IsOptional()
+  addressLevel5Name: string;
 }

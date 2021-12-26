@@ -15,6 +15,7 @@ export class UsersService {
     return await this.usersRepository
       .findOneOrFail({
         where: { username: username },
+        relations: relations,
       })
       .catch((err) => {
         throw new BadRequestException('User not found!');
@@ -56,11 +57,25 @@ export class UsersService {
 
   async getCustomerByIdOrFail(id: string, relations?: string[]) {
     return await this.usersRepository
-      .findOneOrFail(id, {
+      .findOneOrFail(
+        { id, role: UserRoles.CUSTOMER },
+        {
+          relations: relations,
+        },
+      )
+      .catch((err) => {
+        throw new BadRequestException('Customer not found');
+      });
+  }
+
+  async findUserByIdOrFail(id: string, relations?: string[]) {
+    return await this.usersRepository
+      .findOneOrFail({
+        where: { id: id },
         relations: relations,
       })
       .catch((err) => {
-        throw new BadRequestException('Customer not found');
+        throw new BadRequestException('User not found!');
       });
   }
 }

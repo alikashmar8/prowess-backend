@@ -4,7 +4,7 @@ import {
   IsNotEmpty,
   IsNumber, IsString
 } from 'class-validator';
-import { AddressesEnum } from './../../addresses/enums/addresses.enum';
+import { AddressesLevel } from './../../addresses/enums/addresses.enum';
 
 export class CreateCompanyDTO {
   @ApiProperty({ required: true, nullable: false })
@@ -38,9 +38,9 @@ export class CreateCompanyDTO {
   maxCustomersNumber: number;
 
   @IsNotEmpty()
-  @IsEnum(AddressesEnum)
-  @ApiProperty({ enum: AddressesEnum })
-  maxLocationToEnter: AddressesEnum;
+  @IsEnum(AddressesLevel)
+  @ApiProperty({ enum: AddressesLevel })
+  maxLocationToEnter: AddressesLevel;
 
   @ApiProperty({ required: false, nullable: true })
   @IsNotEmpty()

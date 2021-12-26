@@ -1,8 +1,7 @@
-export enum AddressesEnum {
-  COUNTRY = 'COUNTRY',
-  DISTRICT = 'DISTRICT',
-  CITY = 'CITY',
-  AREA = 'AREA',
-  STREET = 'STREET',
-  BUILDING = 'BUILDING',
+export enum AddressesLevel {
+  LEVEL1 = 'LEVEL1',
+  LEVEL2 = 'LEVEL2',
+  LEVEL3 = 'LEVEL3',
+  LEVEL4 = 'LEVEL4',
+  LEVEL5 = 'LEVEL5',
 }

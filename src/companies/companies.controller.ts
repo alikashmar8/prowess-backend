@@ -9,7 +9,7 @@ import {
   Query,
   UseGuards,
   UsePipes,
-  ValidationPipe
+  ValidationPipe,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AdminGuard } from 'src/auth/guards/admin.guard';
@@ -23,6 +23,7 @@ import { OwnCompanyGuard } from './../auth/guards/own-company.guard';
 import { CompaniesService } from './companies.service';
 import { CreateCompanyDTO } from './dtos/create-company.dto';
 import { UpdateCompanyDTO } from './dtos/update-company.dto';
+import { AddressesLevel } from 'src/addresses/enums/addresses.enum';
 
 @ApiTags('companies')
 @Controller('companies')
@@ -39,7 +40,7 @@ export class CompaniesController {
   @Get(':company_id')
   async getById(@Param('company_id') id: string) {
     return await this.companiesService.findById(id, [
-      'parentCompany', 
+      'parentCompany',
       'users',
       'items',
       'subCompanies',
@@ -89,7 +90,47 @@ export class CompaniesController {
     @Param('company_id') company_id: string,
     @Param('customer_id') customer_id: string,
   ) {
-    return await this.companiesService.getCustomerByIdOrFail(customer_id);
+    const company = await this.companiesService.findByIdOrFail(company_id);
+
+    let relations = ['invoices', 'collector', 'plans', 'company'];
+    switch (company.maxLocationLevel) {
+      case AddressesLevel.LEVEL5:
+        relations = [
+          ...relations,
+          ...[
+            'address',
+            'address.parent',
+            'address.parent.parent',
+            'address.parent.parent.parent',
+            'address.parent.parent.parent.parent',
+          ],
+        ];
+        break;
+      case AddressesLevel.LEVEL4:
+        relations = [
+          ...relations,
+          ...[
+            'address',
+            'address.parent',
+            'address.parent.parent',
+            'address.parent.parent.parent',
+          ],
+        ];
+        break;
+      case AddressesLevel.LEVEL3:
+        relations = [
+          ...relations,
+          ...['address', 'address.parent', 'address.parent.parent'],
+        ];
+        break;
+      case AddressesLevel.LEVEL2:
+        relations = [...relations, ...['address', 'address.parent']];
+        break;
+      case AddressesLevel.LEVEL1:
+        relations = [...relations, ...['address']];
+        break;
+    }
+    return await this.companiesService.getCustomerByIdOrFail(customer_id, relations);
   }
 
   @Roles(UserRoles.ADMIN, UserRoles.MANAGER, UserRoles.SUPERVISOR)

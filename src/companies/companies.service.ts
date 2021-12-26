@@ -184,13 +184,12 @@ export class CompaniesService {
         name: data.name,
         email: data.email,
         phoneNumber: data.phoneNumber,
+        address_id: data.address_id,
+      }).catch((err) => {
+        console.error(err);
+        throw new BadRequestException('Error updating customer');
       });
-      // .catch((err) => {
-      //   console.error(err);
-      //   throw new BadRequestException('Error updating customer');
-      // });
 
-      await this.addressesRepository.update(data.address.id, data.address);
       let customer = await this.usersService.findByIdOrFail(id);
       const plans = await this.plansRepository.find({
         where: {
@@ -204,13 +203,10 @@ export class CompaniesService {
     }
   }
 
-  async getCustomerByIdOrFail(customer_id: string) {
-    return await this.usersService.getCustomerByIdOrFail(customer_id, [
-      'address',
-      'invoices',
-      'collector',
-      'plans',
-      'company'
-    ]);
+  async getCustomerByIdOrFail(customer_id: string, relations?: string[]) {
+    return await this.usersService.getCustomerByIdOrFail(
+      customer_id,
+      relations,
+    );
   }
 }
