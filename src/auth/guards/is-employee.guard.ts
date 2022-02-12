@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import { JWT_SECRET } from 'src/common/constants';
+import { employeeValid } from 'src/common/utils/functions';
 import { UserRoles } from 'src/users/enums/user-roles.enum';
 import { User } from 'src/users/user.entity';
 
@@ -23,7 +24,13 @@ export class IsEmployeeGuard implements CanActivate {
       const verified: any = jwt.verify(token, JWT_SECRET);
       let user: User = verified.user;
 
-      if (user.role != 'CUSTOMER' && !user.isSuperAdmin && user.company_id) {
+
+      if (
+        user.role != 'CUSTOMER' &&
+        !user.isSuperAdmin &&
+        user.company_id &&
+        employeeValid(user.expiryDate, user.isActive, user.role)
+      ) {
         request.user = user;
         return true;
       } else {

@@ -28,5 +28,9 @@ export class CreateCustomerDTO {
     @ApiProperty()
     @IsNotEmpty()
     company_id: string;
+
+    @ApiProperty()
+    @IsNotEmpty()
+    collector_id: string;
   }
   

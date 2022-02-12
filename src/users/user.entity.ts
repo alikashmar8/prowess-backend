@@ -73,12 +73,12 @@ export class User extends BaseEntity {
   @JoinColumn({ name: 'address_id' })
   address: Level1Address;
 
-  @OneToOne((type) => User, (user) => user.customers, {
-    onDelete: 'CASCADE',
+  @ManyToOne((type) => User, (user) => user.customers, {
+    onDelete: 'SET NULL',
     nullable: true,
   })
   @JoinColumn({ name: 'collector_id' })
-  collector: User;
+  collector?: User;
 
   @Exclude()
   @OneToMany((type) => Company, (company) => company.createdBy)
@@ -115,5 +115,11 @@ export class User extends BaseEntity {
     )
       return false;
     return true;
+  }
+
+  public get isExpired(): boolean {
+    const expiryDate = new Date(this.expiryDate);
+    const today = new Date();
+    return expiryDate < today;
   }
 }

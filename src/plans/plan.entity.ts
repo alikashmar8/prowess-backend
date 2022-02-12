@@ -24,7 +24,7 @@ export class Plan extends BaseEntity {
   @JoinColumn({ name: 'company_id' })
   company: Company;
 
-  @OneToMany((type) => Invoice, (invoice) => invoice.plan)
+  @ManyToMany((type) => Invoice, (invoice) => invoice.plans)
   invoices: Invoice[];
 
   @ManyToMany((type) => User, (user) => user.plans)

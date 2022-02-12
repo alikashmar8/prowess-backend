@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { IsEmployeeGuard } from 'src/auth/guards/is-employee.guard';
 import { CurrentUser } from 'src/common/decorators/user.decorator';
 import { User } from 'src/users/user.entity';
@@ -7,6 +8,7 @@ import { StoreLevel2Address } from './dtos/store-level2-address.dto';
 import { UpdateLevel2AddressDTO } from './dtos/update-level2-address.dto';
 import { Level2AddressesService } from './level2-addresses.service';
 
+@ApiTags('Level2 Addresses')
 @Controller('level2-addresses')
 export class Level2AddressesController {
     constructor(private level2AddressesService: Level2AddressesService) {}

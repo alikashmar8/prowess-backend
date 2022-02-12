@@ -1,7 +1,13 @@
 import { BaseEntity } from 'src/common/entities/baseEntity';
 import { Company } from 'src/companies/company.entity';
 import { Invoice } from 'src/invoices/invoice.entity';
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToMany,
+  ManyToOne
+} from 'typeorm';
 
 @Entity('items')
 export class Item extends BaseEntity {
@@ -20,11 +26,12 @@ export class Item extends BaseEntity {
   @Column({ nullable: false })
   company_id: string;
 
-  @ManyToOne((type) => Company, (company) => company.items, { onDelete: 'CASCADE' })
+  @ManyToOne((type) => Company, (company) => company.items, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'company_id' })
   company: Company;
 
-  @OneToMany((type) => Invoice, (invoice) => invoice.item)
+  @ManyToMany((type) => Invoice, (invoice) => invoice.items)
   invoices: Invoice[];
-
 }

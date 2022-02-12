@@ -10,6 +10,12 @@ import { Level5AddressesModule } from './level5-addresses/level5-addresses.modul
 @Module({
   controllers: [AddressesController],
   providers: [AddressesService],
-  imports: [Level1AddressesModule, Level2AddressesModule, Level3AddressesModule, Level4AddressesModule, Level5AddressesModule]
+  imports: [
+    Level1AddressesModule,
+    Level2AddressesModule,
+    Level3AddressesModule,
+    Level4AddressesModule,
+    Level5AddressesModule,
+  ],
 })
 export class AddressesModule {}

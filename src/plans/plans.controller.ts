@@ -7,13 +7,15 @@ import {
   Query,
   UseGuards,
   UsePipes,
-  ValidationPipe,
+  ValidationPipe
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { AdminGuard } from 'src/auth/guards/admin.guard';
 import { OwnCompanyGuard } from 'src/auth/guards/own-company.guard';
 import { CreatePlanDTO } from './dtos/create-plan.dto';
 import { PlansService } from './plans.service';
 
+@ApiTags('Plans')
 @Controller('plans')
 export class PlansController {
   constructor(private plansService: PlansService) {}
@@ -23,7 +25,7 @@ export class PlansController {
   async getByCompanyId(
     @Param('company_id') companyId: string,
     @Query('isActive') isActive: boolean,
-  ) {    
+  ) {
     return await this.plansService.findByCompanyId(companyId, isActive);
   }
 

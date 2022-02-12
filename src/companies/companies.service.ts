@@ -2,9 +2,15 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Address } from 'src/addresses/address.entity';
 import { AdminCreateCompanyDTO } from 'src/admin/companies/dtos/admin-create-company.dto';
+import {
+  COLLECTOR_RENEW_AMOUNT,
+  MANAGER_RENEW_AMOUNT,
+  SUPERVISOR_RENEW_AMOUNT,
+} from 'src/common/constants';
 import { removeSpecialCharacters } from 'src/common/utils/functions';
 import { Plan } from 'src/plans/plan.entity';
 import { CreateCustomerDTO } from 'src/users/dtos/create-customer.dto';
+import { CreateEmployeeDTO } from 'src/users/dtos/create-employee.dto';
 import { EditCustomerDTO } from 'src/users/dtos/edit-customer.dto';
 import { UserRoles } from 'src/users/enums/user-roles.enum';
 import { User } from 'src/users/user.entity';
@@ -20,7 +26,6 @@ export class CompaniesService {
     @InjectRepository(Company) private companiesRepository: Repository<Company>,
     @InjectRepository(User) private usersRepository: Repository<User>,
     @InjectRepository(Plan) private plansRepository: Repository<Plan>,
-    @InjectRepository(Address) private addressesRepository: Repository<Address>,
     private usersService: UsersService,
   ) {}
   async getAll() {
@@ -28,16 +33,16 @@ export class CompaniesService {
   }
 
   async store(data: CreateCompanyDTO) {
-    // const superAdmin = await this.usersService.findSuperAdmin();
-    // data.createdBy_id = superAdmin.id;
-    // data.parentCompany_id = null;
     const company = await this.companiesRepository.save(data).catch((err) => {
       console.log(err);
       throw new BadRequestException('Error saving company');
     });
+    let username = removeSpecialCharacters(company.name);
+    const exist = await this.usersService.findByUsername(username);
+    if (exist) username = username + '' + Date.now();
     await this.usersService.store({
       name: 'admin',
-      username: removeSpecialCharacters(company.name),
+      username: username,
       password: '12345678',
       password_confirmation: '12345678',
       role: UserRoles.ADMIN,
@@ -163,12 +168,21 @@ export class CompaniesService {
   }
 
   async storeCustomer(data: CreateCustomerDTO) {
+    const company = await this.findByIdOrFail(data.company_id);
+    const currentCustomersCount = await this.usersRepository
+      .createQueryBuilder('user')
+      .where('company_id = :company_id', { company_id: data.company_id })
+      .andWhere('role = :role', { role: UserRoles.CUSTOMER })
+      .getCount();
+    if (company.maxCustomersNumber <= currentCustomersCount)
+      throw new BadRequestException(
+        'Number of customers exceeded the limit, to increase limit please contact the administrator',
+      );
     let customer = this.usersRepository.create({ ...data, plans: [] });
     customer = await this.usersRepository.save(customer).catch((err) => {
       console.error(err);
       throw new BadRequestException('Error creating customer');
     });
-
     const plans = await this.plansRepository.find({
       where: {
         id: In(data.plans),
@@ -180,15 +194,18 @@ export class CompaniesService {
 
   async updateCustomer(id: string, data: EditCustomerDTO) {
     try {
-      let res = await this.usersRepository.update(id, {
-        name: data.name,
-        email: data.email,
-        phoneNumber: data.phoneNumber,
-        address_id: data.address_id,
-      }).catch((err) => {
-        console.error(err);
-        throw new BadRequestException('Error updating customer');
-      });
+      let res = await this.usersRepository
+        .update(id, {
+          name: data.name,
+          email: data.email,
+          phoneNumber: data.phoneNumber,
+          address_id: data.address_id,
+          collector_id: data.collector_id,
+        })
+        .catch((err) => {
+          console.error(err);
+          throw new BadRequestException('Error updating customer');
+        });
 
       let customer = await this.usersService.findByIdOrFail(id);
       const plans = await this.plansRepository.find({
@@ -208,5 +225,64 @@ export class CompaniesService {
       customer_id,
       relations,
     );
+  }
+
+  async storeEmployee(data: CreateEmployeeDTO) {
+    return await this.usersService.storeEmployee(data);
+  }
+
+  async renewEmployee(employee_id: string) {
+    let employee = await this.usersService.findByIdOrFail(employee_id, [
+      'company',
+    ]);
+    if (!employee.isEmployee)
+      throw new BadRequestException('User is not an employee!');
+    let amountToDeduct = 0;
+    switch (employee.role) {
+      case UserRoles.MANAGER:
+        amountToDeduct = MANAGER_RENEW_AMOUNT;
+        break;
+      case UserRoles.SUPERVISOR:
+        amountToDeduct = SUPERVISOR_RENEW_AMOUNT;
+        break;
+      case UserRoles.COLLECTOR:
+        amountToDeduct = COLLECTOR_RENEW_AMOUNT;
+        break;
+    }
+
+    if (Number(amountToDeduct) > Number(employee.company.balance) || Number(amountToDeduct) <= 0)
+      throw new BadRequestException('Insufficient funds!');
+
+    if (employee.isExpired) {
+      const nextMonth = new Date(new Date().setMonth(new Date().getMonth() + 1));
+      employee.expiryDate = nextMonth
+    } else {
+      employee.expiryDate = new Date(
+        employee.expiryDate.setMonth(employee.expiryDate.getMonth() + 1),
+      );
+    }
+
+    const newBalance =
+      Number(employee.company.balance) - Number(amountToDeduct);
+
+    await this.companiesRepository.update(employee.company_id, {
+      balance: newBalance,
+    });
+
+    if (employee.company.createdBy_id) {
+      //company is created by super admin
+      let superAdmin = await this.usersService.findSuperAdmin();
+      superAdmin.balance = Number(superAdmin.balance) + Number(amountToDeduct);
+      await this.usersRepository.save(superAdmin);
+    } else {
+      //company is related to a parent company
+      let parentCompany = await this.findByIdOrFail(
+        employee.company.parentCompany_id,
+      );
+      parentCompany.balance =
+        Number(parentCompany.balance) + Number(amountToDeduct);
+      await this.companiesRepository.save(parentCompany);
+    }
+    return await this.usersRepository.save(employee);
   }
 }

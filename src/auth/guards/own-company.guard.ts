@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import { JWT_SECRET } from 'src/common/constants';
+import { employeeValid } from 'src/common/utils/functions';
+import { User } from 'src/users/user.entity';
 
 @Injectable()
 export class OwnCompanyGuard implements CanActivate {
@@ -16,18 +18,19 @@ export class OwnCompanyGuard implements CanActivate {
     const authorization = request.headers.authorization;
     if (!authorization) return false;
     const token = authorization.split(' ')[1];
-    if (!token) 
-      return false;    
-
+    if (!token) return false;
     try {
       const params = request.params;
       const company_id = params.company_id;
-
+      if (!company_id) return false;
       const verified: any = jwt.verify(token, JWT_SECRET);
-
-      //TODO: check if user expired     
-      if (verified.user?.company_id == company_id && verified.user?.isActive) {
-        request.user = verified.user;        
+      const user: User = verified.user;
+      if (
+        user.company_id == company_id &&
+        user.isActive &&
+        employeeValid(user.expiryDate, user.isActive, user.role)
+      ) {
+        request.user = user;
         return true;
       } else {
         throw new BadRequestException(

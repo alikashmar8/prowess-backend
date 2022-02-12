@@ -1,9 +1,16 @@
-import { Item } from './../items/item.entity';
 import { BaseEntity } from 'src/common/entities/baseEntity';
-import { User } from 'src/users/user.entity';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { InvoiceTypes } from './enums/invoice-types.enum';
 import { Plan } from 'src/plans/plan.entity';
+import { User } from 'src/users/user.entity';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  JoinTable,
+  ManyToMany,
+  ManyToOne
+} from 'typeorm';
+import { Item } from './../items/item.entity';
+import { InvoiceTypes } from './enums/invoice-types.enum';
 
 @Entity('invoices')
 export class Invoice extends BaseEntity {
@@ -30,26 +37,20 @@ export class Invoice extends BaseEntity {
   isFirstPayment: boolean;
 
   @Column({ nullable: true })
-  notes: string;
+  notes?: string;
 
   @Column()
   user_id: string;
-
-  @Column({ nullable: true })
-  item_id?: string;
-
-  @Column({ nullable: true })
-  plan_id?: string;
 
   @ManyToOne((type) => User, (user) => user.invoices, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @ManyToOne((type) => Item, (item) => item.invoices, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'item_id' })
-  item?: Item;
+  @ManyToMany((type) => Item, (item) => item.invoices, { onDelete: 'CASCADE' })
+  @JoinTable()
+  items?: Item[];
 
-  @ManyToOne((type) => Plan, (plan) => plan.invoices, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'plan_id' })
-  plan?: Plan;
+  @ManyToMany((type) => Plan, (plan) => plan.invoices, { onDelete: 'CASCADE' })
+  @JoinTable()
+  plans?: Plan[];
 }

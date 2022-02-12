@@ -23,6 +23,10 @@ export class EditCustomerDTO {
   address_id?: string;
 
   @ApiProperty()
+  @IsNotEmpty()
+  collector_id?: string;
+
+  @ApiProperty()
   @IsOptional()
   plans: string[];
 }

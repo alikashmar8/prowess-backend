@@ -1,4 +1,3 @@
-import { EditCustomerDTO } from './../users/dtos/edit-customer.dto';
 import {
   Body,
   Controller,
@@ -9,24 +8,28 @@ import {
   Query,
   UseGuards,
   UsePipes,
-  ValidationPipe,
+  ValidationPipe
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { AddressesLevel } from 'src/addresses/enums/addresses.enum';
 import { AdminGuard } from 'src/auth/guards/admin.guard';
 import { IsEmployeeGuard } from 'src/auth/guards/is-employee.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { CurrentUser } from 'src/common/decorators/user.decorator';
+import { getAddressesRelationsList } from 'src/common/utils/functions';
 import { CreateCustomerDTO } from 'src/users/dtos/create-customer.dto';
+import { CreateEmployeeDTO } from 'src/users/dtos/create-employee.dto';
 import { UserRoles } from 'src/users/enums/user-roles.enum';
 import { OwnCompanyGuard } from './../auth/guards/own-company.guard';
+import { EditCustomerDTO } from './../users/dtos/edit-customer.dto';
 import { CompaniesService } from './companies.service';
 import { CreateCompanyDTO } from './dtos/create-company.dto';
 import { UpdateCompanyDTO } from './dtos/update-company.dto';
-import { AddressesLevel } from 'src/addresses/enums/addresses.enum';
 
 @ApiTags('companies')
 @Controller('companies')
+@UsePipes(new ValidationPipe())
 export class CompaniesController {
   constructor(private companiesService: CompaniesService) {}
 
@@ -58,6 +61,24 @@ export class CompaniesController {
   }
 
   @UseGuards(new OwnCompanyGuard(), new AdminGuard())
+  @Post(':company_id/employees')
+  async storeEmployee(
+    @Param('company_id') id: string,
+    @Body() data: CreateEmployeeDTO,
+  ) {
+    return await this.companiesService.storeEmployee(data);
+  }
+
+  @UseGuards(new OwnCompanyGuard(), new AdminGuard())
+  @Put(':company_id/employees/:employee_id/renew')
+  async renew(
+    @Param('company_id') company_id: string,
+    @Param('employee_id') employee_id: string
+  ) {
+    return await this.companiesService.renewEmployee(employee_id);
+  }
+
+  @UseGuards(new OwnCompanyGuard(), new AdminGuard())
   @Get(':company_id/employees')
   async getCompanyEmployees(
     @Param('company_id') id: string,
@@ -73,9 +94,9 @@ export class CompaniesController {
     @CurrentUser() user,
     @Query() query,
   ) {
-    return await this.companiesService.getCompanyCustomers(id, user, query, [
-      'address',
-    ]);
+    let company =  await this.companiesService.findByIdOrFail(user.company_id);
+    let relations = getAddressesRelationsList(company.maxLocationLevel)
+    return await this.companiesService.getCompanyCustomers(id, user, query, relations);
   }
 
   @Roles(
@@ -130,7 +151,10 @@ export class CompaniesController {
         relations = [...relations, ...['address']];
         break;
     }
-    return await this.companiesService.getCustomerByIdOrFail(customer_id, relations);
+    return await this.companiesService.getCustomerByIdOrFail(
+      customer_id,
+      relations,
+    );
   }
 
   @Roles(UserRoles.ADMIN, UserRoles.MANAGER, UserRoles.SUPERVISOR)
