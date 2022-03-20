@@ -1,8 +1,15 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import {
+  COLLECTOR_RENEW_AMOUNT,
+  MANAGER_RENEW_AMOUNT,
+  SUPERVISOR_RENEW_AMOUNT,
+} from 'src/common/constants';
 import { Company } from 'src/companies/company.entity';
+import { InvoiceTypes } from 'src/invoices/enums/invoice-types.enum';
+import { Invoice } from 'src/invoices/invoice.entity';
 import { User } from 'src/users/user.entity';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import { CreateEmployeeDTO } from './dtos/create-employee.dto';
 import { CreateUserDTO } from './dtos/create-user.dto';
 import { UserRoles } from './enums/user-roles.enum';
@@ -12,6 +19,7 @@ export class UsersService {
   constructor(
     @InjectRepository(User) private usersRepository: Repository<User>,
     @InjectRepository(Company) private companiesRepository: Repository<Company>,
+    @InjectRepository(Invoice) private invoicesRepository: Repository<Invoice>,
   ) {}
 
   async findByUsernameOrFail(username: string, relations?: string[]) {
@@ -69,7 +77,7 @@ export class UsersService {
   }
 
   async getCustomerByIdOrFail(id: string, relations?: string[]) {
-    return await this.usersRepository
+    let user = await this.usersRepository
       .findOneOrFail(
         { id, role: UserRoles.CUSTOMER },
         {
@@ -79,6 +87,20 @@ export class UsersService {
       .catch((err) => {
         throw new BadRequestException('Customer not found');
       });
+
+    let invoices = await this.invoicesRepository.find({
+      where: {
+        user_id: user.id,
+        type: InvoiceTypes.PLANS_INVOICE,
+      },
+      order: {
+        dueDate: 'DESC',
+      },
+      take: 12,
+    });
+    user.invoices = invoices;
+
+    return user;
   }
 
   async findUserByIdOrFail(id: string, relations?: string[]) {
@@ -99,6 +121,8 @@ export class UsersService {
       .catch((err) => {
         throw new BadRequestException('Company not found!');
       });
+    let amountToDeduct = 0;
+
     switch (role) {
       case UserRoles.ADMIN:
       case UserRoles.CUSTOMER:
@@ -115,6 +139,8 @@ export class UsersService {
           throw new BadRequestException(
             'Maximum number of managers is reached, contact administrator to increase limit',
           );
+        amountToDeduct = MANAGER_RENEW_AMOUNT;
+
         break;
       case UserRoles.SUPERVISOR:
         const currentSupervisors: User[] = await this.usersRepository.find({
@@ -128,6 +154,8 @@ export class UsersService {
           throw new BadRequestException(
             'Maximum number of supervisors is reached, contact administrator to increase limit',
           );
+        amountToDeduct = SUPERVISOR_RENEW_AMOUNT;
+
         break;
       case UserRoles.COLLECTOR:
         const currentCollectors: User[] = await this.usersRepository.find({
@@ -141,8 +169,15 @@ export class UsersService {
           throw new BadRequestException(
             'Maximum number of collectors is reached, contact administrator to increase limit',
           );
+        amountToDeduct = COLLECTOR_RENEW_AMOUNT;
+
         break;
     }
+    if (
+      Number(amountToDeduct) > Number(company.balance) ||
+      Number(amountToDeduct) <= 0
+    )
+      throw new BadRequestException('Insufficient funds!');
     const employee = this.usersRepository.create(data);
     return await this.usersRepository.save(employee).catch((err) => {
       console.error(err);
@@ -150,15 +185,24 @@ export class UsersService {
     });
   }
 
-  async findCreatedThisDay() {
+  async findPaymentOnThisDay() {
     const today = new Date().getDate();
     return await this.usersRepository
       .createQueryBuilder('user')
-      .where(`Day(user.created_at) = :today`, {
+      .where(`Day(user.dueDate) = :today`, {
         today: today,
       })
       .andWhere('user.role = :role', { role: UserRoles.CUSTOMER })
       .andWhere('user.isActive = :condition', { condition: true })
       .getMany();
+  }
+
+  async deleteEmployee(id: string) {
+    try {
+      return await this.usersRepository.delete(id);
+    } catch (err) {
+      console.log(err);
+      throw new BadRequestException('Error deleting employee');
+    }
   }
 }

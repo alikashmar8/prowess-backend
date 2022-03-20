@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -79,6 +80,15 @@ export class CompaniesController {
   }
 
   @UseGuards(new OwnCompanyGuard(), new AdminGuard())
+  @Delete(':company_id/employees/:employee_id')
+  async deleteEmployee(
+    @Param('company_id') company_id: string,
+    @Param('employee_id') employee_id: string
+  ) {
+    return await this.companiesService.deleteEmployee(employee_id);
+  }
+
+  @UseGuards(new OwnCompanyGuard(), new AdminGuard())
   @Get(':company_id/employees')
   async getCompanyEmployees(
     @Param('company_id') id: string,
@@ -113,7 +123,7 @@ export class CompaniesController {
   ) {
     const company = await this.companiesService.findByIdOrFail(company_id);
 
-    let relations = ['invoices', 'collector', 'plans', 'company'];
+    let relations = ['invoices', 'collector', 'plans', 'company', 'invoices.user'];
     switch (company.maxLocationLevel) {
       case AddressesLevel.LEVEL5:
         relations = [

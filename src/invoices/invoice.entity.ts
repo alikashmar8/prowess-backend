@@ -7,7 +7,7 @@ import {
   JoinColumn,
   JoinTable,
   ManyToMany,
-  ManyToOne
+  ManyToOne,
 } from 'typeorm';
 import { Item } from './../items/item.entity';
 import { InvoiceTypes } from './enums/invoice-types.enum';
@@ -26,6 +26,9 @@ export class Invoice extends BaseEntity {
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   dueDate: Date;
 
+  @Column({ type: 'timestamp', nullable: true })
+  collected_at: Date;
+
   @Column({
     type: 'enum',
     enum: InvoiceTypes,
@@ -42,15 +45,24 @@ export class Invoice extends BaseEntity {
   @Column()
   user_id: string;
 
+  @Column({ nullable: true })
+  collectedBy_id?: string;
+
   @ManyToOne((type) => User, (user) => user.invoices, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @ManyToMany((type) => Item, (item) => item.invoices, { onDelete: 'CASCADE' })
+  @ManyToOne((type) => User, (user) => user.collectedInvoices, {
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'collectedBy_id' })
+  collectedBy: User;
+
+  @ManyToMany((type) => Item, (item) => item.invoices, { onDelete: 'RESTRICT' })
   @JoinTable()
   items?: Item[];
 
-  @ManyToMany((type) => Plan, (plan) => plan.invoices, { onDelete: 'CASCADE' })
+  @ManyToMany((type) => Plan, (plan) => plan.invoices, { onDelete: 'RESTRICT' })
   @JoinTable()
   plans?: Plan[];
 }

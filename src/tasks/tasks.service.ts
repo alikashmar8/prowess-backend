@@ -13,7 +13,7 @@ export class TasksService {
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async generateInvoicesDaily() {
-    const users = await this.usersService.findCreatedThisDay();
+    const users = await this.usersService.findPaymentOnThisDay();
     const ids = users.map((user) => user.id);
     await this.invoicesService.generateUsersInvoices(ids);
   }

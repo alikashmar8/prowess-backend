@@ -4,6 +4,7 @@ import {
   IsDateString,
   IsEnum,
   IsNotEmpty,
+  IsNumber,
   IsNumberString,
   IsOptional,
   IsString,
@@ -30,12 +31,12 @@ export class CreateInvoiceDTO {
 
   @ApiProperty()
   @IsOptional()
-  @IsNumberString()
+  @IsNumber()
   total?: number;
 
   @ApiProperty()
   @IsOptional()
-  @IsNumberString()
+  @IsNumber()
   extraAmount?: number;
 
   @ApiProperty()

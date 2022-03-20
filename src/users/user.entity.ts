@@ -51,6 +51,9 @@ export class User extends BaseEntity {
 
   @Column({ type: 'decimal', default: 0 })
   balance: number;
+  
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  paymentDate: Date;
 
   @Column({ nullable: true })
   address_id?: string;
@@ -87,6 +90,10 @@ export class User extends BaseEntity {
   @Exclude()
   @OneToMany((type) => Invoice, (invoice) => invoice.user)
   invoices: Invoice[];
+
+  @Exclude()
+  @OneToMany((type) => Invoice, (invoice) => invoice.collectedBy)
+  collectedInvoices: Invoice[];
 
   @Exclude()
   @OneToMany((type) => User, (user) => user.collector)

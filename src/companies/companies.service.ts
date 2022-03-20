@@ -1,3 +1,4 @@
+import { Invoice } from './../invoices/invoice.entity';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Address } from 'src/addresses/address.entity';
@@ -19,6 +20,7 @@ import { In, Not, Repository } from 'typeorm';
 import { Company } from './company.entity';
 import { CreateCompanyDTO } from './dtos/create-company.dto';
 import { UpdateCompanyDTO } from './dtos/update-company.dto';
+import { InvoiceTypes } from 'src/invoices/enums/invoice-types.enum';
 
 @Injectable()
 export class CompaniesService {
@@ -26,6 +28,7 @@ export class CompaniesService {
     @InjectRepository(Company) private companiesRepository: Repository<Company>,
     @InjectRepository(User) private usersRepository: Repository<User>,
     @InjectRepository(Plan) private plansRepository: Repository<Plan>,
+    @InjectRepository(Invoice) private invoicesRepository: Repository<Invoice>,
     private usersService: UsersService,
   ) {}
   async getAll() {
@@ -178,6 +181,12 @@ export class CompaniesService {
       throw new BadRequestException(
         'Number of customers exceeded the limit, to increase limit please contact the administrator',
       );
+      
+    if (
+      new Date(data.paymentDate) < new Date(new Date().setHours(0, 0, 0, 0))
+    ) {
+      throw new BadRequestException('Payment date cannot be in the past');
+    }
     let customer = this.usersRepository.create({ ...data, plans: [] });
     customer = await this.usersRepository.save(customer).catch((err) => {
       console.error(err);
@@ -189,6 +198,17 @@ export class CompaniesService {
       },
     });
     customer.plans = plans;
+
+    //TODO: create invoice
+    await this.invoicesRepository.save({
+      user_id: customer.id,
+      extraAmount: 0,
+      isFirstPayment: true,
+      isPaid: true,
+      notes: data.invoice_notes,
+      total: data.invoice_total,
+      type: InvoiceTypes.PLANS_INVOICE,
+    });
     return await this.usersRepository.save(customer);
   }
 
@@ -201,6 +221,7 @@ export class CompaniesService {
           phoneNumber: data.phoneNumber,
           address_id: data.address_id,
           collector_id: data.collector_id,
+          paymentDate: data.paymentDate,
         })
         .catch((err) => {
           console.error(err);
@@ -231,6 +252,10 @@ export class CompaniesService {
     return await this.usersService.storeEmployee(data);
   }
 
+  async deleteEmployee(employee_id: string) {
+    return await this.usersService.deleteEmployee(employee_id);
+  }
+
   async renewEmployee(employee_id: string) {
     let employee = await this.usersService.findByIdOrFail(employee_id, [
       'company',
@@ -250,12 +275,17 @@ export class CompaniesService {
         break;
     }
 
-    if (Number(amountToDeduct) > Number(employee.company.balance) || Number(amountToDeduct) <= 0)
+    if (
+      Number(amountToDeduct) > Number(employee.company.balance) ||
+      Number(amountToDeduct) <= 0
+    )
       throw new BadRequestException('Insufficient funds!');
 
     if (employee.isExpired) {
-      const nextMonth = new Date(new Date().setMonth(new Date().getMonth() + 1));
-      employee.expiryDate = nextMonth
+      const nextMonth = new Date(
+        new Date().setMonth(new Date().getMonth() + 1),
+      );
+      employee.expiryDate = nextMonth;
     } else {
       employee.expiryDate = new Date(
         employee.expiryDate.setMonth(employee.expiryDate.getMonth() + 1),

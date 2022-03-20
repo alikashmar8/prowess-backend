@@ -1,10 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  IsDateString,
   IsEmail,
   IsEnum,
   IsNotEmpty,
   IsOptional,
-  Length,
+  Length
 } from 'class-validator';
 import { Match } from 'src/common/decorators/match.decorator';
 import { UserRoles } from '../enums/user-roles.enum';
@@ -49,4 +50,9 @@ export class CreateUserDTO {
   @IsNotEmpty()
   @ApiProperty({ required: true, nullable: false })
   company_id: string;
+
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  @IsDateString()
+  paymentDate?: Date;
 }

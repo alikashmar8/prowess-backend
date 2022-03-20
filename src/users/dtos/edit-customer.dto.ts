@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  IsDateString,
   IsEmail,
   IsNotEmpty, IsOptional
 } from 'class-validator';
@@ -29,4 +30,9 @@ export class EditCustomerDTO {
   @ApiProperty()
   @IsOptional()
   plans: string[];
+
+  @ApiProperty()
+  @IsOptional()
+  @IsDateString()
+  paymentDate?: Date;
 }
