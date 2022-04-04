@@ -96,6 +96,7 @@ export class UsersService {
       order: {
         dueDate: 'DESC',
       },
+      relations: ['collectedBy'],
       take: 12,
     });
     user.invoices = invoices;

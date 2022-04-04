@@ -5,7 +5,6 @@ import {
   IsEnum,
   IsNotEmpty,
   IsNumber,
-  IsNumberString,
   IsOptional,
   IsString,
   ValidateIf,
@@ -67,4 +66,13 @@ export class CreateInvoiceDTO {
   @ApiProperty()
   @IsNotEmpty()
   company_id: string;
+
+  @ApiProperty()
+  @IsOptional()
+  collectedBy_id?: string;
+
+  @ApiProperty()
+  @IsOptional()
+  @IsDateString()
+  collected_at?: Date;
 }

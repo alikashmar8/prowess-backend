@@ -21,6 +21,7 @@ import { Company } from './company.entity';
 import { CreateCompanyDTO } from './dtos/create-company.dto';
 import { UpdateCompanyDTO } from './dtos/update-company.dto';
 import { InvoiceTypes } from 'src/invoices/enums/invoice-types.enum';
+import { InvoicesService } from 'src/invoices/invoices.service';
 
 @Injectable()
 export class CompaniesService {
@@ -30,6 +31,7 @@ export class CompaniesService {
     @InjectRepository(Plan) private plansRepository: Repository<Plan>,
     @InjectRepository(Invoice) private invoicesRepository: Repository<Invoice>,
     private usersService: UsersService,
+    private invoicesService: InvoicesService,
   ) {}
   async getAll() {
     return await this.companiesRepository.find();
@@ -181,7 +183,7 @@ export class CompaniesService {
       throw new BadRequestException(
         'Number of customers exceeded the limit, to increase limit please contact the administrator',
       );
-      
+
     if (
       new Date(data.paymentDate) < new Date(new Date().setHours(0, 0, 0, 0))
     ) {
@@ -242,10 +244,14 @@ export class CompaniesService {
   }
 
   async getCustomerByIdOrFail(customer_id: string, relations?: string[]) {
-    return await this.usersService.getCustomerByIdOrFail(
+    let user: any = await this.usersService.getCustomerByIdOrFail(
       customer_id,
       relations,
     );
+    user.unpaidInvoices = await this.invoicesService.getCustomerUnpaidInvoices(
+      user.id,
+    );
+    return user;
   }
 
   async storeEmployee(data: CreateEmployeeDTO) {

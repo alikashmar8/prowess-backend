@@ -9,7 +9,7 @@ import {
   Query,
   UseGuards,
   UsePipes,
-  ValidationPipe
+  ValidationPipe,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AddressesLevel } from 'src/addresses/enums/addresses.enum';
@@ -74,7 +74,7 @@ export class CompaniesController {
   @Put(':company_id/employees/:employee_id/renew')
   async renew(
     @Param('company_id') company_id: string,
-    @Param('employee_id') employee_id: string
+    @Param('employee_id') employee_id: string,
   ) {
     return await this.companiesService.renewEmployee(employee_id);
   }
@@ -83,7 +83,7 @@ export class CompaniesController {
   @Delete(':company_id/employees/:employee_id')
   async deleteEmployee(
     @Param('company_id') company_id: string,
-    @Param('employee_id') employee_id: string
+    @Param('employee_id') employee_id: string,
   ) {
     return await this.companiesService.deleteEmployee(employee_id);
   }
@@ -104,9 +104,14 @@ export class CompaniesController {
     @CurrentUser() user,
     @Query() query,
   ) {
-    let company =  await this.companiesService.findByIdOrFail(user.company_id);
-    let relations = getAddressesRelationsList(company.maxLocationLevel)
-    return await this.companiesService.getCompanyCustomers(id, user, query, relations);
+    let company = await this.companiesService.findByIdOrFail(user.company_id);
+    let relations = getAddressesRelationsList(company.maxLocationLevel);
+    return await this.companiesService.getCompanyCustomers(
+      id,
+      user,
+      query,
+      relations,
+    );
   }
 
   @Roles(
@@ -123,7 +128,13 @@ export class CompaniesController {
   ) {
     const company = await this.companiesService.findByIdOrFail(company_id);
 
-    let relations = ['invoices', 'collector', 'plans', 'company', 'invoices.user'];
+    let relations = [
+      'invoices',
+      'invoices.collectedBy',
+      'collector',
+      'plans',
+      'company',
+    ];
     switch (company.maxLocationLevel) {
       case AddressesLevel.LEVEL5:
         relations = [

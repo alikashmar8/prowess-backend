@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IdsListDTO } from 'src/common/dtos/ids-list.dto';
+import { CollectListDTO } from 'src/common/dtos/collect-list.dto';
 import { Item } from 'src/items/item.entity';
 import { Plan } from 'src/plans/plan.entity';
 import { User } from 'src/users/user.entity';
@@ -75,6 +75,8 @@ export class InvoicesService {
         total: data.total,
         type: data.type,
         user_id: data.user_id,
+        collectedBy_id: data.collectedBy_id,
+        collected_at: data.collected_at,
       })
       .catch(() => {
         throw new BadRequestException('Error Creating Invoice');
@@ -96,11 +98,13 @@ export class InvoicesService {
     return await this.invoicesRepository.save(invoice);
   }
 
-  forgive(data: IdsListDTO) {
+  forgive(data: CollectListDTO) {
     data.ids.forEach(async (id) => {
       await this.invoicesRepository.update(id, {
         isPaid: true,
         total: 0,
+        collectedBy_id: data.collector_id,
+        collected_at: new Date(),
       });
     });
   }
@@ -125,12 +129,37 @@ export class InvoicesService {
       .getMany();
   }
 
-  async collect(data: IdsListDTO) {
+  async collect(data: CollectListDTO) {
     await data.ids.forEach(async (id) => {
       await this.invoicesRepository.update(id, {
         isPaid: true,
+        collectedBy_id: data.collector_id,
+        collected_at: new Date(),
       });
     });
     return true;
+  }
+
+  async findCustomerInvoices(customer_id: string, type?: InvoiceTypes) {
+    let query = await this.invoicesRepository
+      .createQueryBuilder('invoice')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .leftJoinAndSelect('invoice.plans', 'plans')
+      .leftJoinAndSelect('invoice.user', 'user')
+      .leftJoinAndSelect('invoice.collectedBy', 'collectedBy')
+      .where('user_id = :customer_id', { customer_id });
+    if (type) {
+      query = query.andWhere('invoice.type = :type', { type });
+    }
+    return await query.getMany();
+  }
+
+  async getCustomerUnpaidInvoices(customer_id: string) {
+    return await this.invoicesRepository
+      .createQueryBuilder('invoice')
+      .innerJoinAndSelect('invoice.user', 'user')
+      .where('user.id = :customer_id', { customer_id })
+      .andWhere('invoice.isPaid = :condition', { condition: false })
+      .getMany();
   }
 }

@@ -4,6 +4,7 @@ import { Address } from 'src/addresses/address.entity';
 import { CompaniesService } from 'src/companies/companies.service';
 import { Company } from 'src/companies/company.entity';
 import { Invoice } from 'src/invoices/invoice.entity';
+import { InvoicesService } from 'src/invoices/invoices.service';
 import { Plan } from 'src/plans/plan.entity';
 import { User } from 'src/users/user.entity';
 import { UsersService } from 'src/users/users.service';
@@ -15,7 +16,7 @@ import { ItemsService } from './items.service';
   imports: [
     TypeOrmModule.forFeature([Company, Item, User, Address, Plan, Invoice]),
   ],
-  providers: [ItemsService, CompaniesService, UsersService],
+  providers: [ItemsService, CompaniesService, UsersService, InvoicesService],
   controllers: [ItemsController],
 })
 export class ItemsModule {}
