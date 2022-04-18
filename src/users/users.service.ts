@@ -3,13 +3,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import {
   COLLECTOR_RENEW_AMOUNT,
   MANAGER_RENEW_AMOUNT,
-  SUPERVISOR_RENEW_AMOUNT,
+  SUPERVISOR_RENEW_AMOUNT
 } from 'src/common/constants';
 import { Company } from 'src/companies/company.entity';
 import { InvoiceTypes } from 'src/invoices/enums/invoice-types.enum';
 import { Invoice } from 'src/invoices/invoice.entity';
 import { User } from 'src/users/user.entity';
-import { Between, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { CreateEmployeeDTO } from './dtos/create-employee.dto';
 import { CreateUserDTO } from './dtos/create-user.dto';
 import { UserRoles } from './enums/user-roles.enum';
@@ -205,5 +205,36 @@ export class UsersService {
       console.log(err);
       throw new BadRequestException('Error deleting employee');
     }
+  }
+
+  async findExpiredActiveUsers() {
+    const today = new Date();
+    today.setUTCHours(23, 59, 59, 999);
+
+    let users = await this.usersRepository
+      .createQueryBuilder('user')
+      .where('user.expiryDate < :today', { today: today })
+      .andWhere('user.isActive = :condition', { condition: true })
+      .getMany();
+
+    return users;
+  }
+
+  async updateUsersStatus(ids: string[], isActive: boolean) {
+    return await this.usersRepository.update(
+      {
+        id: In(ids),
+      },
+      { isActive: isActive },
+    );
+  }
+  
+  findAllActiveCustomers() {
+    return this.usersRepository.find({
+      where: {
+        role: UserRoles.CUSTOMER,
+        isActive: true,
+      },
+    });
   }
 }

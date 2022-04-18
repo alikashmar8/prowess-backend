@@ -3,7 +3,7 @@ import {
   ExecutionContext,
   HttpException,
   HttpStatus,
-  Injectable
+  Injectable,
 } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import { JWT_SECRET } from 'src/common/constants';

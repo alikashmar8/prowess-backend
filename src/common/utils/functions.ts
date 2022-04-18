@@ -1,4 +1,5 @@
 import { AddressesLevel } from 'src/addresses/enums/addresses.enum';
+import { Level1Address } from 'src/addresses/level1-addresses/level1-address.entity';
 import { Plan } from 'src/plans/plan.entity';
 import { UserRoles } from 'src/users/enums/user-roles.enum';
 
@@ -128,11 +129,38 @@ export function employeeValid(
 export function getPlansTotal(plans: Plan[]): any {
   let total = 0;
   plans.forEach((plan) => {
-    console.log(plan.price);
     total += Number(plan.price);
-    console.log(total);
-  });
-  console.log('returning total: ', total);
-  
+  });  
   return total;
+}
+
+
+export function getAddressString(level1Address: Level1Address): string {
+  let result: string = '';
+  result += level1Address.name;
+  if (level1Address.parent) {
+    const level2 = level1Address.parent;
+    result = level2.name + ', ' + result;
+    if (level2.parent) {
+      const level3 = level2.parent;
+      result = level3.name + ', ' + result;
+      if (level3.parent) {
+        const level4 = level3.parent;
+        result = level4.name + ', ' + result;
+        if (level4.parent) {
+          const level5 = level4.parent;
+          result = level5.name + ', ' + result;
+          return result;
+        } else {
+          return result;
+        }
+      } else {
+        return result;
+      }
+    } else {
+      return result;
+    }
+  } else {
+    return result;
+  }
 }

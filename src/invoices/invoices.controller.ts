@@ -6,11 +6,13 @@ import {
   Post,
   Put,
   Query,
+  Res,
   UseGuards,
   UsePipes,
-  ValidationPipe,
+  ValidationPipe
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 import { AuthGuard } from 'src/auth/guards/auth.guard';
 import { IsEmployeeGuard } from 'src/auth/guards/is-employee.guard';
 import { OwnCompanyGuard } from 'src/auth/guards/own-company.guard';
@@ -21,6 +23,7 @@ import { CollectListDTO } from 'src/common/dtos/collect-list.dto';
 import { getAddressesRelationsListWithUserKeyword } from 'src/common/utils/functions';
 import { CompaniesService } from 'src/companies/companies.service';
 import { UserRoles } from 'src/users/enums/user-roles.enum';
+import { User } from 'src/users/user.entity';
 import { CreateInvoiceDTO } from './dtos/create-invoice.dto';
 import { InvoiceTypes } from './enums/invoice-types.enum';
 import { InvoicesService } from './invoices.service';
@@ -45,6 +48,16 @@ export class InvoicesController {
     return await this.invoicesService.findCustomerInvoices(customer_id, type);
   }
 
+  @UseGuards(new AuthGuard())
+  @Get(':id/report/pdf')
+  async getInvoicePdf(
+    @Res() res: Response,
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+  ) {
+    return await this.invoicesService.getInvoicePdf(res, id, user);
+  }
+
   @UseGuards(new OwnCompanyGuard())
   @Post(':company_id')
   async store(
@@ -57,14 +70,35 @@ export class InvoicesController {
 
   @UseGuards(new OwnCompanyGuard())
   @Get(':company_id/unpaid')
-  async getUnpaidInvoices(@CurrentUser() user) {
-    return await this.invoicesService.findUnpaidInvoices(user.company_id);
+  async getUnpaidInvoices(
+    @CurrentUser() user,
+    @Param('company_id') company_id,
+    @Query('search') search,
+  ) {
+    return await this.invoicesService.findUnpaidInvoices(
+      user.company_id,
+      search,
+    );
   }
 
   @UseGuards(new OwnCompanyGuard())
-  @Get(':company_id/this-month')
-  async getThisMonthInvoices(@CurrentUser() user) {
-    return await this.invoicesService.findThisMonthInvoices(user.company_id);
+  @Get(':company_id/month')
+  async getThisMonthInvoices(
+    @CurrentUser() user,
+    @Param('company_id') company_id,
+    @Query('search') search: string,
+    @Query('searchMonth') date: Date,
+  ) {
+    if (!date) {
+      date = new Date();
+    } else {
+      date = new Date(date);
+    }
+    return await this.invoicesService.findInvoicesByMonth(
+      user.company_id,
+      date,
+      search,
+    );
   }
 
   @UseGuards(new OwnCompanyGuard())
@@ -74,7 +108,6 @@ export class InvoicesController {
     @CurrentUser() user,
     @Param('company_id') companyId: string,
   ) {
-    //  let relations: string[] = []
     const company = await this.companiesService.findByIdOrFail(companyId);
     let relations = getAddressesRelationsListWithUserKeyword(
       company.maxLocationLevel,
@@ -108,5 +141,15 @@ export class InvoicesController {
     @Body() body: CollectListDTO,
   ) {
     return await this.invoicesService.collect(body);
+  }
+
+  @Get('reports/pdf/unpaid')
+  async generatePDFUnpaid(@CurrentUser() user: User, @Res() res) {
+    return await this.invoicesService.generatePDF(res, user.company_id);
+  }
+
+  @Get('reports/excel/unpaid')
+  async generateExcelUnpaid(@CurrentUser() user: User, @Res() res: Response) {
+    return await this.invoicesService.generateExcel(res, user.company_id);
   }
 }
