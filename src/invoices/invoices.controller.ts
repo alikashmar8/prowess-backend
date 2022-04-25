@@ -9,7 +9,7 @@ import {
   Res,
   UseGuards,
   UsePipes,
-  ValidationPipe
+  ValidationPipe,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -145,11 +145,47 @@ export class InvoicesController {
 
   @Get('reports/pdf/unpaid')
   async generatePDFUnpaid(@CurrentUser() user: User, @Res() res) {
-    return await this.invoicesService.generatePDF(res, user.company_id);
+    return await this.invoicesService.generatePDFUnpaid(res, user.company_id);
+  }
+
+  @Get('reports/pdf/by-month')
+  async generatePDFByMonth(
+    @CurrentUser() user: User,
+    @Res() res,
+    @Query('date') date,
+  ) {
+    if (!date) {
+      date = new Date();
+    } else {
+      date = new Date(date);
+    }
+    return await this.invoicesService.generatePDFByMonth(
+      res,
+      user.company_id,
+      date,
+    );
   }
 
   @Get('reports/excel/unpaid')
   async generateExcelUnpaid(@CurrentUser() user: User, @Res() res: Response) {
     return await this.invoicesService.generateExcel(res, user.company_id);
+  }
+
+  @Get('reports/excel/by-month')
+  async generateExcelByMonth(
+    @CurrentUser() user: User,
+    @Res() res: Response,
+    @Query('date') date: Date,
+  ) {
+    if (date) {
+      date = new Date(date);
+    } else {
+      date = new Date();
+    }
+    return await this.invoicesService.generateExcelByMonth(
+      res,
+      user.company_id,
+      date,
+    );
   }
 }

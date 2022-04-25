@@ -4,11 +4,13 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { log } from 'console';
+import { Response } from 'express';
 import { createReadStream } from 'fs';
-import { AddressesLevel } from 'src/addresses/enums/addresses.enum';
 import { CollectListDTO } from 'src/common/dtos/collect-list.dto';
-import { getInvoicePdf, getInvoicesReportHtml } from 'src/common/utils/reports-html';
+import {
+  getInvoicePdf,
+  getInvoicesReportHtml,
+} from 'src/common/utils/reports-html';
 import { Item } from 'src/items/item.entity';
 import { Plan } from 'src/plans/plan.entity';
 import { User } from 'src/users/user.entity';
@@ -22,7 +24,6 @@ import {
 import { CreateInvoiceDTO } from './dtos/create-invoice.dto';
 import { InvoiceTypes } from './enums/invoice-types.enum';
 import { Invoice } from './invoice.entity';
-import { Response } from 'express';
 var pdf = require('html-pdf');
 
 @Injectable()
@@ -234,7 +235,7 @@ export class InvoicesService {
       .getMany();
   }
 
-  async generatePDF(res, company_id: string) {
+  async generatePDFUnpaid(res, company_id: string) {
     const invoices = await this.findUnpaidInvoices(company_id);
 
     const currentUser = await this.usersRepository.findOne({
@@ -258,6 +259,35 @@ export class InvoicesService {
             (new Date().getMonth() + 1) +
             '-' +
             new Date().getFullYear() +
+            '.pdf',
+        });
+        stream.pipe(res);
+        return res;
+      });
+  }
+
+  async generatePDFByMonth(res, company_id: string, date: Date) {
+    const invoices = await this.findInvoicesByMonth(company_id, date);
+
+    const currentUser = await this.usersRepository.findOne({
+      where: {
+        company_id,
+      },
+      relations: ['company'],
+    });
+
+    pdf
+      .create(getInvoicesReportHtml(invoices, currentUser.company))
+      .toStream(function (err, stream) {
+        res.set({
+          'Content-Type': 'application/pdf',
+          'Content-Disposition':
+            'attachment; filename=' +
+            currentUser.company.name +
+            '-unpaid-invoices' +
+            (date.getMonth() + 1) +
+            '-' +
+            date.getFullYear() +
             '.pdf',
         });
         stream.pipe(res);
@@ -316,7 +346,7 @@ export class InvoicesService {
     return res;
   }
 
-  async getInvoicePdf(res: Response,id: string, user: User) {
+  async getInvoicePdf(res: Response, id: string, user: User) {
     const maxLocationLevel: any = await this.usersRepository
       .createQueryBuilder('user')
       .innerJoinAndSelect('user.company', 'company')
@@ -325,7 +355,9 @@ export class InvoicesService {
       .getRawOne();
     console.log(maxLocationLevel.company_maxLocationLevel);
 
-    let relations = getAddressesRelationsListWithUserKeyword(maxLocationLevel.company_maxLocationLevel);
+    let relations = getAddressesRelationsListWithUserKeyword(
+      maxLocationLevel.company_maxLocationLevel,
+    );
     const invoice = await this.findById(id, [
       'items',
       'plans',
@@ -338,22 +370,84 @@ export class InvoicesService {
       throw new ForbiddenException('You are not allowed to view this invoice');
     }
 
-    pdf.create(getInvoicePdf(invoice, getAddressString(invoice.user.address))).toStream(function (err, stream) {
-      res.set({
-        'Content-Type': 'application/pdf',
-        'Content-Disposition':
-          'attachment; filename=invoice-' +
-          invoice.id +
-         '-date-' +
-          new Date().getDate() +
-          '-' +
-          (new Date().getMonth() + 1) +
-          '-' +
-          new Date().getFullYear() +
-          '.pdf',
+    pdf
+      .create(getInvoicePdf(invoice, getAddressString(invoice.user.address)))
+      .toStream(function (err, stream) {
+        res.set({
+          'Content-Type': 'application/pdf',
+          'Content-Disposition':
+            'attachment; filename=invoice-' +
+            invoice.id +
+            '-date-' +
+            new Date().getDate() +
+            '-' +
+            (new Date().getMonth() + 1) +
+            '-' +
+            new Date().getFullYear() +
+            '.pdf',
+        });
+        stream.pipe(res);
+        return res;
       });
-      stream.pipe(res);
-      return res;
+  }
+
+  async generateExcelByMonth(res: Response, company_id: string, date: Date) {
+    let year = date.getFullYear();
+    let month = date.getMonth();
+    var firstDay = new Date(year, month, 1);
+    var lastDay = new Date(year, month + 1, 0);
+    const invoices = await this.invoicesRepository
+      .createQueryBuilder('invoice')
+      .innerJoinAndSelect('invoice.user', 'user')
+      .leftJoinAndSelect('invoice.collectedBy', 'collectedBy')
+      .where('user.company_id = :company_id', { company_id })
+      .andWhere(
+        `invoice.dueDate
+          BETWEEN :begin
+          AND :end`,
+        { begin: firstDay, end: lastDay },
+      )
+      .orderBy('invoice.dueDate', 'DESC')
+      .select([
+        'invoice.id as id',
+        'user.name as customer',
+        'user.phoneNumber as PhoneNumber',
+        'invoice.dueDate as DueDate',
+        'invoice.isPaid as IsPaid',
+        'collectedBy.name as CollectedBy',
+        'invoice.collected_at as CollectedAt',
+        'invoice.total as Total',
+      ])
+      .getRawMany();
+    const user = await this.usersRepository.findOne({
+      where: {
+        company_id,
+      },
+      relations: ['company'],
     });
+
+    const wb = XLSX.utils.book_new();
+    const newWorksheet = XLSX.utils.json_to_sheet(invoices);
+    XLSX.utils.book_append_sheet(wb, newWorksheet, 'Invoices');
+    const wbOptions = { bookType: 'xlsx', type: 'string', cellDates: true };
+    const filename =
+      user.company.name +
+      '-' +
+      new Date().getDate() +
+      '-' +
+      (new Date().getMonth() + 1) +
+      '-' +
+      new Date().getFullYear() +
+      '.xlsx';
+    // @ts-ignore
+    XLSX.writeFile(wb, filename, wbOptions);
+    const stream = createReadStream(filename);
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename=' + filename,
+    });
+    stream.pipe(res);
+    return res;
   }
 }
