@@ -7,6 +7,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { CompaniesModule } from './companies/companies.module';
+import { CompaniesService } from './companies/companies.service';
 import { Company } from './companies/company.entity';
 import { Invoice } from './invoices/invoice.entity';
 import { InvoicesModule } from './invoices/invoices.module';
@@ -26,8 +27,8 @@ import { UsersService } from './users/users.service';
       type: 'mysql',
       host: 'localhost',
       port: 3306,
-      username: 'root',
-      password: '',
+      username: 'admin',
+      password: 'admin',
       database: 'prowess_db',
       synchronize: true,
       logging: false,
@@ -43,9 +44,15 @@ import { UsersService } from './users/users.service';
     AuthModule,
     AdminCompaniesModule,
     ScheduleModule.forRoot(),
-    TypeOrmModule.forFeature([User, Company, Invoice, Plan, Item])
+    TypeOrmModule.forFeature([User, Company, Invoice, Plan, Item]),
   ],
   controllers: [AppController],
-  providers: [AppService, TasksService, InvoicesService, UsersService],
+  providers: [
+    AppService,
+    TasksService,
+    InvoicesService,
+    UsersService,
+    CompaniesService,
+  ],
 })
 export class AppModule {}

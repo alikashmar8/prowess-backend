@@ -1,7 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
-  Injectable,
+  Injectable
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Response } from 'express';
@@ -9,17 +9,18 @@ import { createReadStream } from 'fs';
 import { CollectListDTO } from 'src/common/dtos/collect-list.dto';
 import {
   getInvoicePdf,
-  getInvoicesReportHtml,
+  getInvoicesReportHtml
 } from 'src/common/utils/reports-html';
 import { Item } from 'src/items/item.entity';
 import { Plan } from 'src/plans/plan.entity';
+import { UserRoles } from 'src/users/enums/user-roles.enum';
 import { User } from 'src/users/user.entity';
 import { Brackets, In, Repository } from 'typeorm';
 import * as XLSX from 'xlsx';
 import {
   getAddressesRelationsListWithUserKeyword,
   getAddressString,
-  getPlansTotal,
+  getPlansTotal
 } from '../common/utils/functions';
 import { CreateInvoiceDTO } from './dtos/create-invoice.dto';
 import { InvoiceTypes } from './enums/invoice-types.enum';
@@ -28,6 +29,79 @@ var pdf = require('html-pdf');
 
 @Injectable()
 export class InvoicesService {
+  async findAll(
+    currentUser: User,
+    data?: {
+      search?: string;
+      employee_id?: string;
+      plan_id?: string;
+      start_date?: Date;
+      end_date?: Date;
+      type: InvoiceTypes;
+    },
+  ) {
+    let query: any = await this.invoicesRepository
+      .createQueryBuilder('invoice')
+      .innerJoinAndSelect('invoice.user', 'user')
+      .leftJoinAndSelect('user.collector', 'collector')
+      .leftJoinAndSelect('invoice.collectedBy', 'collectedBy')
+      .leftJoinAndSelect('invoice.plans', 'plan')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .where('user.company_id = :company_id', {
+        company_id: currentUser.company_id,
+      });
+    if (
+      currentUser.role != UserRoles.ADMIN &&
+      currentUser.role != UserRoles.MANAGER
+    ) {
+      query = query.andWhere('user.collector_id = :collector_id', {
+        collector_id: currentUser.id,
+      });
+    }
+    if (data) {
+      if (data.search) {
+        query = query.andWhere(
+          new Brackets((qb) => {
+            qb.where('user.name like :name', { name: `%${data.search}%` })
+              .orWhere('user.username like :username', {
+                username: `%${data.search}%`,
+              })
+              .orWhere('invoice.notes like :note', { note: `%${data.search}%` })
+              .orWhere('invoice.total like :total', {
+                total: `%${data.search}%`,
+              })
+              .orWhere('invoice.dueDate like :date', {
+                date: `%${data.search}%`,
+              });
+          }),
+        );
+      }
+      if (data.employee_id) {
+        query = query.andWhere('user.collector_id = :employee_id', {
+          employee_id: data.employee_id,
+        });
+      }
+      if (data.plan_id) {
+        query = query.andWhere('plan.id = :plan_id', { plan_id: data.plan_id });
+      }
+      if (data.start_date) {
+        query = query.andWhere('invoice.dueDate >= :start_date', {
+          start_date: data.start_date,
+        });
+      }
+      if (data.end_date) {
+        query = query.andWhere('invoice.dueDate <= :end_date', {
+          end_date: data.end_date,
+        });
+      }
+      if (data.type) {
+        query = query.andWhere('invoice.type = :type', { type: data.type });
+      }
+    }
+
+    query = await query.orderBy('invoice.dueDate', 'DESC').getMany();
+    return query;
+  }
   constructor(
     @InjectRepository(Invoice) private invoicesRepository: Repository<Invoice>,
     @InjectRepository(User) private usersRepository: Repository<User>,
@@ -63,25 +137,130 @@ export class InvoicesService {
     return true;
   }
 
-  async findUnpaidInvoices(company_id: string, search?: string) {
+  async findUnpaidInvoices(
+    user: User,
+    data?: {
+      search?: string;
+      employee_id?: string;
+      plan_id?: string;
+      start_date?: Date;
+      end_date?: Date;
+    },
+  ) {
     let query: any = this.invoicesRepository
       .createQueryBuilder('invoice')
       .innerJoinAndSelect('invoice.user', 'user')
+      .leftJoinAndSelect('user.collector', 'collector')
       .leftJoinAndSelect('invoice.collectedBy', 'collectedBy')
-      .where('user.company_id = :company_id', { company_id })
+      .leftJoinAndSelect('invoice.plans', 'plan')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .where('user.company_id = :company_id', { company_id: user.company_id })
       .andWhere('invoice.isPaid = :condition', { condition: false });
-    if (search) {
-      query = query.andWhere(
-        new Brackets((qb) => {
-          qb.where('user.name like :name', { name: `%${search}%` })
-            .orWhere('user.username like :username', {
-              username: `%${search}%`,
-            })
-            .orWhere('invoice.notes like :note', { note: `%${search}%` })
-            .orWhere('invoice.total like :total', { total: `%${search}%` })
-            .orWhere('invoice.dueDate like :date', { date: `%${search}%` });
-        }),
-      );
+    if (user.role != UserRoles.ADMIN && user.role != UserRoles.MANAGER) {
+      query = query.andWhere('user.collector_id = :collector_id', {
+        collector_id: user.id,
+      });
+    }
+    if (data) {
+      if (data.search) {
+        query = query.andWhere(
+          new Brackets((qb) => {
+            qb.where('user.name like :name', { name: `%${data.search}%` })
+              .orWhere('user.username like :username', {
+                username: `%${data.search}%`,
+              })
+              .orWhere('invoice.notes like :note', { note: `%${data.search}%` })
+              .orWhere('invoice.total like :total', {
+                total: `%${data.search}%`,
+              })
+              .orWhere('invoice.dueDate like :date', {
+                date: `%${data.search}%`,
+              });
+          }),
+        );
+      }
+      if (data.employee_id) {
+        query = query.andWhere('user.collector_id = :employee_id', {
+          employee_id: data.employee_id,
+        });
+      }
+      if (data.plan_id) {
+        query = query.andWhere('plan.id = :plan_id', { plan_id: data.plan_id });
+      }
+      if (data.start_date) {
+        query = query.andWhere('invoice.dueDate >= :start_date', {
+          start_date: data.start_date,
+        });
+      }
+      if (data.end_date) {
+        query = query.andWhere('invoice.dueDate <= :end_date', {
+          end_date: data.end_date,
+        });
+      }
+    }
+
+    query = await query.orderBy('invoice.dueDate', 'DESC').getMany();
+    return query;
+  }
+
+  async findPaidInvoices(
+    user: User,
+    data?: {
+      search?: string;
+      employee_id?: string;
+      plan_id?: string;
+      start_date?: Date;
+      end_date?: Date;
+    },
+  ): Promise<Invoice[]> {
+    let query: any = this.invoicesRepository
+      .createQueryBuilder('invoice')
+      .innerJoinAndSelect('invoice.user', 'user')
+      .leftJoinAndSelect('user.collector', 'collector')
+      .leftJoinAndSelect('invoice.collectedBy', 'collectedBy')
+      .leftJoinAndSelect('invoice.plans', 'plan')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .where('user.company_id = :company_id', { company_id: user.company_id })
+      .andWhere('invoice.isPaid = :condition', { condition: true });
+    if (user.role != UserRoles.ADMIN && user.role != UserRoles.MANAGER) {
+      query = query.andWhere('user.id = :user_id', { user_id: user.id });
+    }
+    if (data) {
+      if (data.search) {
+        query = query.andWhere(
+          new Brackets((qb) => {
+            qb.where('user.name like :name', { name: `%${data.search}%` })
+              .orWhere('user.username like :username', {
+                username: `%${data.search}%`,
+              })
+              .orWhere('invoice.notes like :note', { note: `%${data.search}%` })
+              .orWhere('invoice.total like :total', {
+                total: `%${data.search}%`,
+              })
+              .orWhere('invoice.dueDate like :date', {
+                date: `%${data.search}%`,
+              });
+          }),
+        );
+      }
+      if (data.employee_id) {
+        query = query.andWhere('user.collector_id = :employee_id', {
+          employee_id: data.employee_id,
+        });
+      }
+      if (data.plan_id) {
+        query = query.andWhere('plan.id = :plan_id', { plan_id: data.plan_id });
+      }
+      if (data.start_date) {
+        query = query.andWhere('invoice.dueDate >= :start_date', {
+          start_date: data.start_date,
+        });
+      }
+      if (data.end_date) {
+        query = query.andWhere('invoice.dueDate <= :end_date', {
+          end_date: data.end_date,
+        });
+      }
     }
 
     query = await query.orderBy('invoice.dueDate', 'DESC').getMany();
@@ -235,8 +414,13 @@ export class InvoicesService {
       .getMany();
   }
 
-  async generatePDFUnpaid(res, company_id: string) {
-    const invoices = await this.findUnpaidInvoices(company_id);
+  async generatePDF(res: Response, ids: string[], company_id: string) {
+    const invoices = await this.invoicesRepository.find({
+      where: {
+        id: In(ids),
+      },
+      relations: ['user', 'collectedBy'],
+    });
 
     const currentUser = await this.usersRepository.findOne({
       where: {
@@ -253,7 +437,70 @@ export class InvoicesService {
           'Content-Disposition':
             'attachment; filename=' +
             currentUser.company.name +
+            '-invoices' +
+            new Date().getDate() +
+            '-' +
+            (new Date().getMonth() + 1) +
+            '-' +
+            new Date().getFullYear() +
+            '.pdf',
+        });
+        stream.pipe(res);
+        return res;
+      });
+  }
+
+  async generatePDFUnpaid(res, user: User) {
+    const invoices = await this.findUnpaidInvoices(user);
+
+    // to get relation
+    const currentUser = await this.usersRepository.findOne({
+      where: {
+        company_id: user.company_id,
+      },
+      relations: ['company'],
+    });
+
+    pdf
+      .create(getInvoicesReportHtml(invoices, currentUser.company))
+      .toStream(function (err, stream) {
+        res.set({
+          'Content-Type': 'application/pdf',
+          'Content-Disposition':
+            'attachment; filename=' +
+            currentUser.company.name +
             '-unpaid-invoices' +
+            new Date().getDate() +
+            '-' +
+            (new Date().getMonth() + 1) +
+            '-' +
+            new Date().getFullYear() +
+            '.pdf',
+        });
+        stream.pipe(res);
+        return res;
+      });
+  }
+
+  async generatePDFPaid(res: any, user: User) {
+    const invoices = await this.findPaidInvoices(user);
+
+    const currentUser = await this.usersRepository.findOne({
+      where: {
+        company_id: user.company_id,
+      },
+      relations: ['company'],
+    });
+
+    pdf
+      .create(getInvoicesReportHtml(invoices, currentUser.company))
+      .toStream(function (err, stream) {
+        res.set({
+          'Content-Type': 'application/pdf',
+          'Content-Disposition':
+            'attachment; filename=' +
+            currentUser.company.name +
+            '-paid-invoices' +
             new Date().getDate() +
             '-' +
             (new Date().getMonth() + 1) +
@@ -295,7 +542,53 @@ export class InvoicesService {
       });
   }
 
-  async generateExcel(res, company_id) {
+  async generateExcel(res: Response, ids: string[], company_id: string) {
+    const invoices: any[] = await this.invoicesRepository.find({
+      where: {
+        id: In(ids),
+      },
+      relations: ['user', 'collectedBy'],
+    });
+
+    let invoices_array = [
+      [
+        'ID',
+        'Customer Name',
+        'Phone Number',
+        'Total',
+        'Due Date',
+        'Is Paid',
+        'Collected At',
+        'Collected By',
+      ],
+    ];
+
+    invoices.forEach((invoice) => {
+      invoices_array.push([
+        invoice.id,
+        invoice.user.name,
+        invoice.user.phoneNumber,
+        invoice.total + '',
+        invoice.dueDate ? invoice.dueDate.toLocaleDateString() : 'N/A',
+        invoice.isPaid ? 'Yes' : 'No',
+        invoice.collected_at
+          ? invoice.collected_at.toLocaleDateString()
+          : 'N/A',
+        invoice.collectedBy ? invoice.collectedBy.name : '',
+      ]);
+    });
+
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.aoa_to_sheet(invoices_array);
+    worksheet['!cols'] = this.fitToColumn(invoices_array);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+    const timestamp = new Date().getTime();
+    XLSX.writeFile(workbook, `excels/invoices-${company_id}-${timestamp}.xlsx`);
+    res.sendFile(`excels/invoices-${company_id}-${timestamp}.xlsx`, {
+      root: './',
+    });
+  }
+  async generateUnpaidExcel(res, company_id) {
     const invoices = await this.invoicesRepository
       .createQueryBuilder('invoice')
       .innerJoinAndSelect('invoice.user', 'user')
@@ -335,7 +628,58 @@ export class InvoicesService {
       new Date().getFullYear() +
       '.xlsx';
     // @ts-ignore
-    XLSX.writeFile(wb, filename, wbOptions);
+    XLSX.writeFile(wb, 'excels/' + filename, wbOptions);
+    const stream = createReadStream(filename);
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename=' + filename,
+    });
+    stream.pipe(res);
+    return res;
+  }
+
+  async generatePaidExcel(res, company_id) {
+    const invoices = await this.invoicesRepository
+      .createQueryBuilder('invoice')
+      .innerJoinAndSelect('invoice.user', 'user')
+      .leftJoinAndSelect('invoice.collectedBy', 'collectedBy')
+      .where('user.company_id = :company_id', { company_id })
+      .andWhere('invoice.isPaid = :condition', { condition: true })
+      .orderBy('invoice.dueDate', 'DESC')
+      .select([
+        'invoice.id as id',
+        'user.name as customer',
+        'user.phoneNumber as PhoneNumber',
+        'invoice.dueDate as DueDate',
+        'invoice.isPaid as IsPaid',
+        'collectedBy.name as CollectedBy',
+        'invoice.collected_at as CollectedAt',
+        'invoice.total as Total',
+      ])
+      .getRawMany();
+    const user = await this.usersRepository.findOne({
+      where: {
+        company_id,
+      },
+      relations: ['company'],
+    });
+
+    const wb = XLSX.utils.book_new();
+    const newWorksheet = XLSX.utils.json_to_sheet(invoices);
+    XLSX.utils.book_append_sheet(wb, newWorksheet, 'Invoices');
+    const wbOptions = { bookType: 'xlsx', type: 'string', cellDates: true };
+    const filename =
+      user.company.name +
+      '-' +
+      new Date().getDate() +
+      '-' +
+      (new Date().getMonth() + 1) +
+      '-' +
+      new Date().getFullYear() +
+      '.xlsx';
+    // @ts-ignore
+    XLSX.writeFile(wb, 'excels/' + filename, wbOptions);
     const stream = createReadStream(filename);
     res.set({
       'Content-Type':
@@ -440,7 +784,7 @@ export class InvoicesService {
       new Date().getFullYear() +
       '.xlsx';
     // @ts-ignore
-    XLSX.writeFile(wb, filename, wbOptions);
+    XLSX.writeFile(wb, 'excels/' + filename, wbOptions);
     const stream = createReadStream(filename);
     res.set({
       'Content-Type':
@@ -449,5 +793,14 @@ export class InvoicesService {
     });
     stream.pipe(res);
     return res;
+  }
+
+  fitToColumn(arrayOfArray) {
+    // get maximum character of each column
+    return arrayOfArray[0].map((a, i) => ({
+      wch: Math.max(
+        ...arrayOfArray.map((a2) => (a2[i] ? a2[i].toString().length : 0)),
+      ),
+    }));
   }
 }

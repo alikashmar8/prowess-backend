@@ -29,7 +29,7 @@ export class EditCustomerDTO {
 
   @ApiProperty()
   @IsOptional()
-  plans: string[];
+  plans?: string[];
 
   @ApiProperty()
   @IsOptional()

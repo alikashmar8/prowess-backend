@@ -1,6 +1,7 @@
-import * as bcrypt from 'bcrypt';
 import { Exclude } from 'class-transformer';
-import { BCRYPT_SALT } from 'src/common/constants';
+import { createCipheriv, randomBytes, scrypt } from 'crypto';
+import { BCRYPT_SALT, CRYPTO_IV, CRYPTO_KEY, CRYPTO_SECRET } from 'src/common/constants';
+import * as argon from 'argon2';
 import { BaseEntity } from 'src/common/entities/baseEntity';
 import { removeSpecialCharacters } from 'src/common/utils/functions';
 import { Company } from 'src/companies/company.entity';
@@ -15,8 +16,8 @@ import {
   ManyToMany,
   ManyToOne,
   OneToMany,
-  OneToOne
 } from 'typeorm';
+import { promisify } from 'util';
 import { Level1Address } from './../addresses/level1-addresses/level1-address.entity';
 import { UserRoles } from './enums/user-roles.enum';
 
@@ -51,7 +52,7 @@ export class User extends BaseEntity {
 
   @Column({ type: 'decimal', default: 0 })
   balance: number;
-  
+
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   paymentDate: Date;
 
@@ -105,12 +106,19 @@ export class User extends BaseEntity {
 
   @BeforeInsert()
   async hashPassword() {
+    // const cipher = createCipheriv('aes-256-ctr', CRYPTO_KEY, CRYPTO_IV);
+    // const encryptedText = Buffer.concat([
+    //   cipher.update(password),
+    //   cipher.final(),
+    // ]);
+
     this.username = this.username
       ? this.username
       : removeSpecialCharacters(this.name);
-    this.password = this.password
-      ? await bcrypt.hash(this.password, BCRYPT_SALT)
-      : await bcrypt.hash(this.username, BCRYPT_SALT);
+    // this.password = encryptedText.toString('hex');
+    const password = this.password ? this.password : this.username;
+    const hash = await argon.hash(password);
+    this.password = hash;
     this.email = this.email ? this.email.toLowerCase() : null;
   }
 

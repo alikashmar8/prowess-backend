@@ -23,8 +23,6 @@ export class IsEmployeeGuard implements CanActivate {
     try {
       const verified: any = jwt.verify(token, JWT_SECRET);
       let user: User = verified.user;
-
-
       if (
         user.role != 'CUSTOMER' &&
         !user.isSuperAdmin &&

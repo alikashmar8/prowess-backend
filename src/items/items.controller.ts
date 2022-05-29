@@ -58,9 +58,9 @@ export class ItemsController {
     return await this.itemsService.findByCompanyId(companyId, isActive);
   }
 
-  @UseGuards(new OwnCompanyGuard(), new AdminGuard())
+  @UseGuards(new AdminGuard())
   @UsePipes(new ValidationPipe())
-  @Post('company/:company_id')
+  @Post('')
   async store(@Body() body: CreateItemDTO) {
     return await this.itemsService.store(body);
   }

@@ -1,6 +1,8 @@
 import {
+  BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Post,
@@ -20,6 +22,7 @@ import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { CurrentUser } from 'src/common/decorators/user.decorator';
 import { CollectListDTO } from 'src/common/dtos/collect-list.dto';
+import { IdsList } from 'src/common/dtos/ids-list.dto';
 import { getAddressesRelationsListWithUserKeyword } from 'src/common/utils/functions';
 import { CompaniesService } from 'src/companies/companies.service';
 import { UserRoles } from 'src/users/enums/user-roles.enum';
@@ -37,6 +40,12 @@ export class InvoicesController {
     private invoicesService: InvoicesService,
     private companiesService: CompaniesService,
   ) {}
+
+  @UseGuards(new IsEmployeeGuard())
+  @Get()
+  async getInvoices(@CurrentUser() user: User, @Query() query: any) {
+    return await this.invoicesService.findAll(user, query);
+  }
 
   @UseGuards(new AuthGuard())
   @Get('customer/:customer_id')
@@ -58,27 +67,26 @@ export class InvoicesController {
     return await this.invoicesService.getInvoicePdf(res, id, user);
   }
 
-  @UseGuards(new OwnCompanyGuard())
-  @Post(':company_id')
-  async store(
-    @CurrentUser() user,
-    @Param('company_id') company_id: string,
-    @Body() body: CreateInvoiceDTO,
-  ) {
+  @UseGuards(new IsEmployeeGuard())
+  @Post('')
+  async store(@CurrentUser() user, @Body() body: CreateInvoiceDTO) {
+    if (body.company_id != user.company_id)
+      throw new ForbiddenException(
+        'You are not allowed to perform this action!',
+      );
     return await this.invoicesService.store(body);
   }
 
-  @UseGuards(new OwnCompanyGuard())
-  @Get(':company_id/unpaid')
-  async getUnpaidInvoices(
-    @CurrentUser() user,
-    @Param('company_id') company_id,
-    @Query('search') search,
-  ) {
-    return await this.invoicesService.findUnpaidInvoices(
-      user.company_id,
-      search,
-    );
+  @UseGuards(new IsEmployeeGuard())
+  @Get('unpaid')
+  async getUnpaidInvoices(@CurrentUser() user: User, @Query() query) {
+    return await this.invoicesService.findUnpaidInvoices(user, query);
+  }
+
+  @UseGuards(new IsEmployeeGuard())
+  @Get('paid')
+  async getPaidInvoices(@CurrentUser() user: User, @Query() query) {
+    return await this.invoicesService.findPaidInvoices(user, query);
   }
 
   @UseGuards(new OwnCompanyGuard())
@@ -117,6 +125,7 @@ export class InvoicesController {
       'plans',
       'items',
       'user',
+      'collectedBy',
       ...relations,
     ]);
   }
@@ -145,7 +154,12 @@ export class InvoicesController {
 
   @Get('reports/pdf/unpaid')
   async generatePDFUnpaid(@CurrentUser() user: User, @Res() res) {
-    return await this.invoicesService.generatePDFUnpaid(res, user.company_id);
+    return await this.invoicesService.generatePDFUnpaid(res, user);
+  }
+
+  @Get('reports/pdf/paid')
+  async generatePDFPaid(@CurrentUser() user: User, @Res() res) {
+    return await this.invoicesService.generatePDFPaid(res, user);
   }
 
   @Get('reports/pdf/by-month')
@@ -166,11 +180,53 @@ export class InvoicesController {
     );
   }
 
+  @UseGuards(new IsEmployeeGuard())
   @Get('reports/excel/unpaid')
   async generateExcelUnpaid(@CurrentUser() user: User, @Res() res: Response) {
-    return await this.invoicesService.generateExcel(res, user.company_id);
+    return await this.invoicesService.generateUnpaidExcel(res, user.company_id);
   }
 
+  @UseGuards(new IsEmployeeGuard())
+  @UsePipes(new ValidationPipe())
+  @Post('reports/excel')
+  async generateExcel(
+    @Body() body: IdsList,
+    @CurrentUser() user: User,
+    @Res() res: Response,
+  ) {
+    return await this.invoicesService.generateExcel(
+      res,
+      body.ids,
+      user.company_id,
+    );
+  }
+
+  @UseGuards(new IsEmployeeGuard())
+  @UsePipes(new ValidationPipe())
+  @Get('reports/pdf')
+  async generatePdf(
+    @CurrentUser() user: User,
+    @Res() res: Response,
+    @Query('ids') ids: string[],
+  ) {
+    console.log('ids');
+    console.log(ids);
+
+    console.log('ids.length', ids.length);
+
+    if (!ids) {
+      throw new BadRequestException('No ids provided');
+    }
+    return await this.invoicesService.generatePDF(res, ids, user.company_id);
+  }
+
+  @UseGuards(new IsEmployeeGuard())
+  @Get('reports/excel/unpaid')
+  async generateExcelPaid(@CurrentUser() user: User, @Res() res: Response) {
+    return await this.invoicesService.generatePaidExcel(res, user.company_id);
+  }
+
+  @UseGuards(new IsEmployeeGuard())
   @Get('reports/excel/by-month')
   async generateExcelByMonth(
     @CurrentUser() user: User,

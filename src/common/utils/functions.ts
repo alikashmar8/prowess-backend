@@ -123,17 +123,16 @@ export function employeeValid(
   if (!expiryDate) return false;
   const expiry = new Date(expiryDate);
   const today = new Date();
-  return expiry < today;
+  return expiry > today;
 }
 
 export function getPlansTotal(plans: Plan[]): any {
   let total = 0;
   plans.forEach((plan) => {
     total += Number(plan.price);
-  });  
+  });
   return total;
 }
-
 
 export function getAddressString(level1Address: Level1Address): string {
   let result: string = '';

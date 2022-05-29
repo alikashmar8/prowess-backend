@@ -5,13 +5,15 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
   UsePipes,
-  ValidationPipe
+  ValidationPipe,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AdminGuard } from 'src/auth/guards/admin.guard';
+import { AuthGuard } from 'src/auth/guards/auth.guard';
 import { IsEmployeeGuard } from 'src/auth/guards/is-employee.guard';
 import { OwnCompanyGuard } from 'src/auth/guards/own-company.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
@@ -38,19 +40,31 @@ export class PlansController {
     return await this.plansService.updateStatus(id, body.isActive, user);
   }
 
-  @UseGuards(new OwnCompanyGuard())
-  @Get('company/:company_id')
+  @UseGuards(new AuthGuard())
+  @Get('')
   async getByCompanyId(
-    @Param('company_id') companyId: string,
     @Query('isActive') isActive: boolean,
+    @CurrentUser() user: User,
   ) {
-    return await this.plansService.findByCompanyId(companyId, isActive);
+    return await this.plansService.findByCompanyId(user.company_id, isActive);
   }
 
-  @UseGuards(new OwnCompanyGuard(), new AdminGuard())
+  @UseGuards(new AdminGuard())
   @UsePipes(new ValidationPipe())
-  @Post('company/:company_id')
-  async store(@Body() body: CreatePlanDTO) {
+  @Post()
+  async store(@Body() body: CreatePlanDTO, @CurrentUser() user: User) {
     return await this.plansService.store(body);
+  }
+
+  @Roles(UserRoles.ADMIN, UserRoles.MANAGER)
+  @UseGuards(RolesGuard)
+  @UsePipes(new ValidationPipe())
+  @Put(':id')
+  async update(
+    @Param('id') id: string,
+    @Body() body: CreatePlanDTO,
+    @CurrentUser() user: User,
+  ) {
+    return await this.plansService.update(id, body, user);
   }
 }

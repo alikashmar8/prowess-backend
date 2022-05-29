@@ -1,7 +1,5 @@
-import { Invoice } from './../invoices/invoice.entity';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Address } from 'src/addresses/address.entity';
 import { AdminCreateCompanyDTO } from 'src/admin/companies/dtos/admin-create-company.dto';
 import {
   COLLECTOR_RENEW_AMOUNT,
@@ -9,6 +7,8 @@ import {
   SUPERVISOR_RENEW_AMOUNT,
 } from 'src/common/constants';
 import { removeSpecialCharacters } from 'src/common/utils/functions';
+import { InvoiceTypes } from 'src/invoices/enums/invoice-types.enum';
+import { InvoicesService } from 'src/invoices/invoices.service';
 import { Plan } from 'src/plans/plan.entity';
 import { CreateCustomerDTO } from 'src/users/dtos/create-customer.dto';
 import { CreateEmployeeDTO } from 'src/users/dtos/create-employee.dto';
@@ -16,12 +16,11 @@ import { EditCustomerDTO } from 'src/users/dtos/edit-customer.dto';
 import { UserRoles } from 'src/users/enums/user-roles.enum';
 import { User } from 'src/users/user.entity';
 import { UsersService } from 'src/users/users.service';
-import { In, Not, Repository } from 'typeorm';
+import { ILike, In, Not, Repository } from 'typeorm';
+import { Invoice } from './../invoices/invoice.entity';
 import { Company } from './company.entity';
 import { CreateCompanyDTO } from './dtos/create-company.dto';
 import { UpdateCompanyDTO } from './dtos/update-company.dto';
-import { InvoiceTypes } from 'src/invoices/enums/invoice-types.enum';
-import { InvoicesService } from 'src/invoices/invoices.service';
 
 @Injectable()
 export class CompaniesService {
@@ -117,21 +116,50 @@ export class CompaniesService {
   async getCompanyCustomers(
     company_id: string,
     user: User,
-    query: any,
+    query?: any,
     relations?: string[],
-  ) {
-    const take: number = query.take || 10;
-    const skip: number = query.skip || 0;
+  ): Promise<{ data: any; count: number }> {
+    const take: number = query?.take || 10;
+    const skip: number = query?.skip || 0;
+    const search: string = query?.search || '';
     let result = [];
     let total = 0;
 
+    let whereJson = {
+      company_id: company_id,
+      role: UserRoles.CUSTOMER,
+    };
+    let where = [
+      {
+        name: ILike('%' + search + '%'),
+        ...whereJson,
+      },
+      {
+        phoneNumber: ILike('%' + search + '%'),
+        ...whereJson,
+      },
+      {
+        email: ILike('%' + search + '%'),
+        ...whereJson,
+      },
+      {
+        username: ILike('%' + search + '%'),
+        ...whereJson,
+      },
+      {
+        id: ILike('%' + search + '%'),
+        ...whereJson,
+      },
+      {
+        paymentDate: ILike('%' + search + '%'),
+        ...whereJson,
+      },
+    ];
     switch (user.role) {
-      case UserRoles.ADMIN || UserRoles.MANAGER:
+      case UserRoles.ADMIN:
+      case UserRoles.MANAGER:
         [result, total] = await this.usersRepository.findAndCount({
-          where: {
-            company_id: company_id,
-            role: UserRoles.CUSTOMER,
-          },
+          where: where,
           relations: relations,
           take: take,
           skip: skip,
@@ -140,13 +168,15 @@ export class CompaniesService {
           data: result,
           count: total,
         };
-      case UserRoles.SUPERVISOR || UserRoles.COLLECTOR:
+      case UserRoles.SUPERVISOR:
+      case UserRoles.COLLECTOR:
         [result, total] = await this.usersRepository.findAndCount({
-          where: {
-            company_id: company_id,
-            role: UserRoles.CUSTOMER,
-            collector_id: user.id,
-          },
+          where: where.map((where) => {
+            return {
+              ...where,
+              collector_id: user.id,
+            };
+          }),
           relations: relations,
           take: take,
           skip: skip,
@@ -172,7 +202,7 @@ export class CompaniesService {
     return await this.companiesRepository.findOneOrFail(user.company_id);
   }
 
-  async storeCustomer(data: CreateCustomerDTO) {
+  async storeCustomer(data: CreateCustomerDTO, creator: User) {
     const company = await this.findByIdOrFail(data.company_id);
     const currentCustomersCount = await this.usersRepository
       .createQueryBuilder('user')
@@ -201,16 +231,19 @@ export class CompaniesService {
     });
     customer.plans = plans;
 
-    //TODO: create invoice
     await this.invoicesRepository.save({
       user_id: customer.id,
       extraAmount: 0,
       isFirstPayment: true,
       isPaid: true,
+      collectedBy_id: creator.id,
+      collected_at: new Date(),
       notes: data.invoice_notes,
       total: data.invoice_total,
       type: InvoiceTypes.PLANS_INVOICE,
-    });
+      dueDate: new Date(),
+      plans: plans,
+    });    
     return await this.usersRepository.save(customer);
   }
 
@@ -230,14 +263,14 @@ export class CompaniesService {
           throw new BadRequestException('Error updating customer');
         });
 
-      let customer = await this.usersService.findByIdOrFail(id);
-      const plans = await this.plansRepository.find({
-        where: {
-          id: In(data.plans),
-        },
-      });
-      customer.plans = plans;
-      return await this.usersRepository.save(customer);
+      return await this.usersService.findByIdOrFail(id);
+      // const plans = await this.plansRepository.find({
+      //   where: {
+      //     id: In(data.plans),
+      //   },
+      // });
+      // customer.plans = plans;
+      // return await this.usersRepository.save(customer);
     } catch (err) {
       throw new BadRequestException(err);
     }
@@ -319,6 +352,7 @@ export class CompaniesService {
         Number(parentCompany.balance) + Number(amountToDeduct);
       await this.companiesRepository.save(parentCompany);
     }
+    employee.isActive = true;
     return await this.usersRepository.save(employee);
   }
 }

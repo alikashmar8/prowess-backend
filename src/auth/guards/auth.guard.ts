@@ -24,7 +24,7 @@ export class AuthGuard implements CanActivate {
         if (verified.user.expiryDate) {
           const expiry = new Date(verified.user.expiryDate);
           const today = new Date();
-          return expiry < today;
+          return expiry > today;
         }
         return true;
       } else {

@@ -88,7 +88,7 @@ export class CompaniesController {
     return await this.companiesService.deleteEmployee(employee_id);
   }
 
-  @UseGuards(new OwnCompanyGuard(), new AdminGuard())
+  @UseGuards(new OwnCompanyGuard(), new IsEmployeeGuard())
   @Get(':company_id/employees')
   async getCompanyEmployees(
     @Param('company_id') id: string,
@@ -103,9 +103,9 @@ export class CompaniesController {
     @Param('company_id') id: string,
     @CurrentUser() user,
     @Query() query,
-  ) {
+  ) {    
     let company = await this.companiesService.findByIdOrFail(user.company_id);
-    let relations = getAddressesRelationsList(company.maxLocationLevel);
+    let relations = ['plans', ...getAddressesRelationsList(company.maxLocationLevel)];
     return await this.companiesService.getCompanyCustomers(
       id,
       user,
@@ -191,14 +191,14 @@ export class CompaniesController {
   }
 
   @Post(':company_id/customers')
-  @Roles(UserRoles.ADMIN, UserRoles.MANAGER, UserRoles.SUPERVISOR)
+  @Roles(UserRoles.ADMIN, UserRoles.MANAGER, UserRoles.SUPERVISOR, UserRoles.COLLECTOR)
   @UseGuards(RolesGuard, new OwnCompanyGuard())
   async storeCustomer(
     @Body() body: CreateCustomerDTO,
     @Param('company_id') id: string,
     @CurrentUser() user,
   ) {
-    return await this.companiesService.storeCustomer(body);
+    return await this.companiesService.storeCustomer(body, user);
   }
 
   @UseGuards(new AdminGuard())

@@ -8,10 +8,12 @@ import {
 import { Company } from 'src/companies/company.entity';
 import { InvoiceTypes } from 'src/invoices/enums/invoice-types.enum';
 import { Invoice } from 'src/invoices/invoice.entity';
+import { Plan } from 'src/plans/plan.entity';
 import { User } from 'src/users/user.entity';
 import { In, Repository } from 'typeorm';
 import { CreateEmployeeDTO } from './dtos/create-employee.dto';
 import { CreateUserDTO } from './dtos/create-user.dto';
+import { UpdateUserPlansDTO } from './dtos/update-user-plans.dto';
 import { UserRoles } from './enums/user-roles.enum';
 
 @Injectable()
@@ -20,6 +22,7 @@ export class UsersService {
     @InjectRepository(User) private usersRepository: Repository<User>,
     @InjectRepository(Company) private companiesRepository: Repository<Company>,
     @InjectRepository(Invoice) private invoicesRepository: Repository<Invoice>,
+    @InjectRepository(Plan) private plansRepository: Repository<Plan>,
   ) {}
 
   async findByUsernameOrFail(username: string, relations?: string[]) {
@@ -179,6 +182,31 @@ export class UsersService {
       Number(amountToDeduct) <= 0
     )
       throw new BadRequestException('Insufficient funds!');
+
+    const newBalance =
+      Number(company.balance) - Number(amountToDeduct);
+
+    await this.companiesRepository.update(company.id, {
+      balance: newBalance,
+    });
+
+    if (company.createdBy_id) {
+      //company is created by super admin
+      let superAdmin = await this.findSuperAdmin();
+      superAdmin.balance = Number(superAdmin.balance) + Number(amountToDeduct);
+      await this.usersRepository.save(superAdmin);
+    } else {
+      //company is related to a parent company
+
+      let parentCompany = await this.companiesRepository
+      .findOneOrFail(company.parentCompany_id)
+      .catch((err) => {
+        throw new BadRequestException('Company not found!');
+      });
+      parentCompany.balance =
+        Number(parentCompany.balance) + Number(amountToDeduct);
+      await this.companiesRepository.save(parentCompany);
+    }
     const employee = this.usersRepository.create(data);
     return await this.usersRepository.save(employee).catch((err) => {
       console.error(err);
@@ -228,7 +256,7 @@ export class UsersService {
       { isActive: isActive },
     );
   }
-  
+
   findAllActiveCustomers() {
     return this.usersRepository.find({
       where: {
@@ -236,5 +264,40 @@ export class UsersService {
         isActive: true,
       },
     });
+  }
+
+  async findById(id: string, relations?: string[]): Promise<User> {
+    return await this.usersRepository
+      .findOneOrFail(id, { relations })
+      .catch(() => {
+        throw new BadRequestException('User not found!');
+      });
+  }
+
+  async updateUserPlans(
+    id: string,
+    data: UpdateUserPlansDTO,
+    currentUser: User,
+  ): Promise<any> {
+    const user = await this.findByIdOrFail(id);
+    const plans = await this.plansRepository.find({
+      where: {
+        id: In(data.ids),
+      },
+    });
+    await this.invoicesRepository.save({
+      user_id: id,
+      type: InvoiceTypes.PLANS_INVOICE,
+      dueDate: new Date(),
+      collectedBy: currentUser,
+      plans,
+      collected_at: new Date(),
+      isFirstPayment: true,
+      isPaid: true,
+      notes: data.invoice_note,
+      total: data.invoice_total,
+    });
+    user.plans = plans;
+    return await this.usersRepository.save(user);
   }
 }

@@ -15,8 +15,9 @@ export class TasksService {
   @Cron(CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT)
   async generateInvoicesDaily() {
     const users = await this.usersService.findAllActiveCustomers();
-    const ids = users.map((user) => user.id);    
+    const ids = users.map((user) => user.id);
     await this.invoicesService.generateUsersInvoices(ids);
+    console.log('monthly generated invoices executed for users: ', ids);
   }
 
   @Cron(CronExpression.EVERY_10_HOURS)

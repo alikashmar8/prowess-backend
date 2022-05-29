@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsNumberString } from 'class-validator';
+import {
+  IsBoolean,
+  IsNotEmpty,
+  IsNumber,
+  IsNumberString,
+  IsOptional,
+} from 'class-validator';
 
 export class CreatePlanDTO {
   @ApiProperty()
@@ -10,6 +16,11 @@ export class CreatePlanDTO {
   @IsNotEmpty()
   @IsNumber()
   price: number;
+
+  @ApiProperty()
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 
   @ApiProperty()
   @IsNotEmpty()
