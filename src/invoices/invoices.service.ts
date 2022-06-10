@@ -37,6 +37,7 @@ export class InvoicesService {
       plan_id?: string;
       start_date?: Date;
       end_date?: Date;
+      isPaid?: boolean;
       type: InvoiceTypes;
     },
   ) {
@@ -58,7 +59,7 @@ export class InvoicesService {
         collector_id: currentUser.id,
       });
     }
-    if (data) {
+    if (data) {      
       if (data.search) {
         query = query.andWhere(
           new Brackets((qb) => {
@@ -92,6 +93,19 @@ export class InvoicesService {
       if (data.end_date) {
         query = query.andWhere('invoice.dueDate <= :end_date', {
           end_date: data.end_date,
+        });
+      }
+      if (data.isPaid != null) {
+        if (typeof data.isPaid == 'string') {
+          if (data.isPaid == 'true') {            
+            data.isPaid = true;
+          }
+          else if(data.isPaid == 'false') {
+            data.isPaid = false;
+          }
+        }
+        query = query.andWhere('invoice.isPaid = :isPaid', {
+          isPaid: data.isPaid,
         });
       }
       if (data.type) {
