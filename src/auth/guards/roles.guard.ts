@@ -1,7 +1,9 @@
 import {
   CanActivate,
-  ExecutionContext, HttpException,
-  HttpStatus, Injectable
+  ExecutionContext,
+  HttpException,
+  HttpStatus,
+  Injectable
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import * as jwt from 'jsonwebtoken';

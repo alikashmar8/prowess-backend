@@ -11,7 +11,7 @@ import {
   Res,
   UseGuards,
   UsePipes,
-  ValidationPipe,
+  ValidationPipe
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -109,14 +109,10 @@ export class InvoicesController {
     );
   }
 
-  @UseGuards(new OwnCompanyGuard())
-  @Get(':company_id/invoice/:id')
-  async getById(
-    @Param('id') id: string,
-    @CurrentUser() user,
-    @Param('company_id') companyId: string,
-  ) {
-    const company = await this.companiesService.findByIdOrFail(companyId);
+  @UseGuards(new AuthGuard())
+  @Get(':id')
+  async getById(@Param('id') id: string, @CurrentUser() user) {
+    const company = await this.companiesService.findByIdOrFail(user.company_id);
     let relations = getAddressesRelationsListWithUserKeyword(
       company.maxLocationLevel,
     );
@@ -131,24 +127,16 @@ export class InvoicesController {
   }
 
   @Roles(UserRoles.MANAGER, UserRoles.SUPERVISOR, UserRoles.COLLECTOR)
-  @UseGuards(new OwnCompanyGuard(), RolesGuard)
-  @Put(':company_id/forgive')
-  async forgiveInvoices(
-    @CurrentUser() user,
-    @Param('company_id') company_id: string,
-    @Body() body: CollectListDTO,
-  ) {
+  @UseGuards(RolesGuard)
+  @Put('forgive')
+  async forgiveInvoices(@CurrentUser() user, @Body() body: CollectListDTO) {
     return await this.invoicesService.forgive(body);
   }
 
   @Roles(UserRoles.MANAGER, UserRoles.SUPERVISOR, UserRoles.COLLECTOR)
-  @UseGuards(new OwnCompanyGuard(), RolesGuard)
-  @Put(':company_id/collect')
-  async collectInvoices(
-    @CurrentUser() user,
-    @Param('company_id') company_id: string,
-    @Body() body: CollectListDTO,
-  ) {
+  @UseGuards(RolesGuard)
+  @Put('collect')
+  async collectInvoices(@CurrentUser() user, @Body() body: CollectListDTO) {
     return await this.invoicesService.collect(body);
   }
 
