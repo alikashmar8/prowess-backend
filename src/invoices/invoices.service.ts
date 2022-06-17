@@ -1,7 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
-  Injectable
+  Injectable,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Response } from 'express';
@@ -9,7 +9,7 @@ import { createReadStream } from 'fs';
 import { CollectListDTO } from 'src/common/dtos/collect-list.dto';
 import {
   getInvoicePdf,
-  getInvoicesReportHtml
+  getInvoicesReportHtml,
 } from 'src/common/utils/reports-html';
 import { Item } from 'src/items/item.entity';
 import { Plan } from 'src/plans/plan.entity';
@@ -20,7 +20,7 @@ import * as XLSX from 'xlsx';
 import {
   getAddressesRelationsListWithUserKeyword,
   getAddressString,
-  getPlansTotal
+  getPlansTotal,
 } from '../common/utils/functions';
 import { CreateInvoiceDTO } from './dtos/create-invoice.dto';
 import { InvoiceTypes } from './enums/invoice-types.enum';
@@ -59,7 +59,7 @@ export class InvoicesService {
         collector_id: currentUser.id,
       });
     }
-    if (data) {      
+    if (data) {
       if (data.search) {
         query = query.andWhere(
           new Brackets((qb) => {
@@ -78,29 +78,71 @@ export class InvoicesService {
         );
       }
       if (data.employee_id) {
-        query = query.andWhere('user.collector_id = :employee_id', {
-          employee_id: data.employee_id,
-        });
+        query = query.andWhere(
+          new Brackets((qb) => {
+            qb.where('user.collector_id = :employee_id', {
+              employee_id: data.employee_id,
+            }).orWhere('invoice.collectedBy_id = :employee_id', {
+              employee_id: data.employee_id,
+            });
+          }),
+        );
       }
       if (data.plan_id) {
         query = query.andWhere('plan.id = :plan_id', { plan_id: data.plan_id });
       }
-      if (data.start_date) {
-        query = query.andWhere('invoice.dueDate >= :start_date', {
-          start_date: data.start_date,
-        });
-      }
-      if (data.end_date) {
-        query = query.andWhere('invoice.dueDate <= :end_date', {
-          end_date: data.end_date,
-        });
+      if (data.start_date && data.end_date) {
+        let start_date = new Date(data.start_date);
+        start_date.setHours(0, 0, 0, 0);
+        let end_date = new Date(data.end_date);
+        end_date.setHours(23, 59, 59, 999);
+        query = query.andWhere(
+          new Brackets((qb) => {
+            qb.where('invoice.dueDate BETWEEN :start_date AND :end_date', {
+              start_date: start_date,
+              end_date: end_date,
+            }).orWhere(
+              'invoice.collected_at BETWEEN :start_date AND :end_date',
+              {
+                start_date: start_date,
+                end_date: end_date,
+              },
+            );
+          }),
+        );
+      } else {
+        if (data.start_date) {
+          let start_date = new Date(data.start_date);
+          start_date.setHours(0, 0, 0, 0);
+          query = query.andWhere(
+            new Brackets((qb) => {
+              qb.where('invoice.dueDate >= :start_date', {
+                start_date: start_date,
+              }).orWhere('invoice.collected_at >= :start_date', {
+                start_date: start_date,
+              });
+            }),
+          );
+        }
+        if (data.end_date) {
+          let end_date = new Date(data.end_date);
+          end_date.setHours(23, 59, 59, 999);
+          query = query.andWhere(
+            new Brackets((qb) => {
+              qb.where('invoice.dueDate <= :end_date', {
+                end_date: end_date,
+              }).orWhere('invoice.collected_at <= :end_date', {
+                end_date: end_date,
+              });
+            }),
+          );
+        }
       }
       if (data.isPaid != null) {
         if (typeof data.isPaid == 'string') {
-          if (data.isPaid == 'true') {            
+          if (data.isPaid == 'true') {
             data.isPaid = true;
-          }
-          else if(data.isPaid == 'false') {
+          } else if (data.isPaid == 'false') {
             data.isPaid = false;
           }
         }
