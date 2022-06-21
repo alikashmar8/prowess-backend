@@ -111,10 +111,9 @@ export class User extends BaseEntity {
     //   cipher.update(password),
     //   cipher.final(),
     // ]);
-
     this.username = this.username
       ? this.username
-      : removeSpecialCharacters(this.name);
+      : removeSpecialCharacters(this.name) + (Date.now());
     // this.password = encryptedText.toString('hex');
     const password = this.password ? this.password : this.username;
     const hash = await argon.hash(password);

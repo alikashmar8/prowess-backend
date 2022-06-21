@@ -16,7 +16,7 @@ import { EditCustomerDTO } from 'src/users/dtos/edit-customer.dto';
 import { UserRoles } from 'src/users/enums/user-roles.enum';
 import { User } from 'src/users/user.entity';
 import { UsersService } from 'src/users/users.service';
-import { ILike, In, Not, Repository } from 'typeorm';
+import { Brackets, ILike, In, Not, Repository } from 'typeorm';
 import { Invoice } from './../invoices/invoice.entity';
 import { Company } from './company.entity';
 import { CreateCompanyDTO } from './dtos/create-company.dto';
@@ -116,76 +116,116 @@ export class CompaniesService {
   async getCompanyCustomers(
     company_id: string,
     user: User,
-    query?: any,
+    queryParam?: any,
     relations?: string[],
   ): Promise<{ data: any; count: number }> {
-    const take: number = query?.take || 10;
-    const skip: number = query?.skip || 0;
-    const search: string = query?.search || '';
+    const take: number = queryParam?.take || 10;
+    const skip: number = queryParam?.skip || 0;
+    const search: string = queryParam?.search || '';
+    const level5Add: string = queryParam?.level5Address || '';
+    const level4Add: string = queryParam?.level4Address || '';
+    const level3Add: string = queryParam?.level3Address || '';
+    const level2Add: string = queryParam?.level2Address || '';
+    const level1Add: string = queryParam?.level1Address || '';
+
     let result = [];
     let total = 0;
 
-    let whereJson = {
-      company_id: company_id,
-      role: UserRoles.CUSTOMER,
-    };
-    let where = [
-      {
-        name: ILike('%' + search + '%'),
-        ...whereJson,
-      },
-      {
-        phoneNumber: ILike('%' + search + '%'),
-        ...whereJson,
-      },
-      {
-        email: ILike('%' + search + '%'),
-        ...whereJson,
-      },
-      {
-        username: ILike('%' + search + '%'),
-        ...whereJson,
-      },
-      {
-        id: ILike('%' + search + '%'),
-        ...whereJson,
-      },
-      {
-        paymentDate: ILike('%' + search + '%'),
-        ...whereJson,
-      },
-    ];
+    let query: any = await this.usersRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.address', 'address')
+      .where(`user.company_id = ${company_id}`)
+      .andWhere(`user.role = 'CUSTOMER'`);
+    if (level1Add) {
+      query = await query.andWhere(`address.id = ${level1Add}`);
+    } else if (level2Add) {
+      query = await query
+        .innerJoinAndSelect('address.parent', 'level2')
+        .andWhere(`level2.id = ${level2Add}`);
+    } else if (level3Add) {
+      query = await query
+        .innerJoinAndSelect('address.parent', 'level2')
+        .innerJoinAndSelect('level2.parent', 'level3')
+        .andWhere(`level3.id = ${level3Add}`);
+    } else if (level4Add) {
+      query = await query
+        .innerJoinAndSelect('address.parent', 'level2')
+        .innerJoinAndSelect('level2.parent', 'level3')
+        .innerJoinAndSelect('level3.parent', 'level4')
+        .andWhere(`level4.id = ${level4Add}`);
+    } else if (level5Add) {
+      query = await query
+        .innerJoinAndSelect('address.parent', 'level2')
+        .innerJoinAndSelect('level2.parent', 'level3')
+        .innerJoinAndSelect('level3.parent', 'level4')
+        .innerJoinAndSelect('level5.parent', 'level5')
+        .andWhere(`level5.id = ${level5Add}`);
+    }
+
+    if (search) {
+      query = await query.andWhere(
+        new Brackets((qb) => {
+          qb.where('user.name like :name', { name: `%${search}%` })
+            .orWhere('user.username like :username', {
+              username: `%${search}%`,
+            })
+            .orWhere('user.phoneNumber like :phoneNumber', {
+              phoneNumber: `%${search}%`,
+            })
+            .orWhere('user.email like :email', { email: `%${search}%` })
+            .orWhere('user.id like :id', { id: `%${search}%` })
+            .orWhere('user.paymentDate like :date', { date: `%${search}%` });
+        }),
+      );
+    }
+    // let whereJson = {
+    //   company_id: company_id,
+    //   role: UserRoles.CUSTOMER,
+    // };
+    // if (level1Add) {
+    //   whereJson['address_id'] = level1Add;
+    // } else if (level2Add) {
+    //   whereJson;
+    // }
+    // let where = [
+    //   {
+    //     name: ILike('%' + search + '%'),
+    //     ...whereJson,
+    //   },
+    //   {
+    //     phoneNumber: ILike('%' + search + '%'),
+    //     ...whereJson,
+    //   },
+    //   {
+    //     email: ILike('%' + search + '%'),
+    //     ...whereJson,
+    //   },
+    //   {
+    //     username: ILike('%' + search + '%'),
+    //     ...whereJson,
+    //   },
+    //   {
+    //     id: ILike('%' + search + '%'),
+    //     ...whereJson,
+    //   },
+    //   {
+    //     paymentDate: ILike('%' + search + '%'),
+    //     ...whereJson,
+    //   },
+    // ];
     switch (user.role) {
-      case UserRoles.ADMIN:
-      case UserRoles.MANAGER:
-        [result, total] = await this.usersRepository.findAndCount({
-          where: where,
-          relations: relations,
-          take: take,
-          skip: skip,
-        });
-        return {
-          data: result,
-          count: total,
-        };
       case UserRoles.SUPERVISOR:
       case UserRoles.COLLECTOR:
-        [result, total] = await this.usersRepository.findAndCount({
-          where: where.map((where) => {
-            return {
-              ...where,
-              collector_id: user.id,
-            };
-          }),
-          relations: relations,
-          take: take,
-          skip: skip,
-        });
-        return {
-          data: result,
-          count: total,
-        };
+        query = await query.andWhere(`collector_id = ${user.id}`);
+        break;
     }
+
+    query = await query.skip(skip).take(take).getManyAndCount();
+    console.log(query);
+    return {
+      data: query[0],
+      count: query[1],
+    };
   }
 
   async findByEmployeeId(user_id: string) {
@@ -243,7 +283,7 @@ export class CompaniesService {
       type: InvoiceTypes.PLANS_INVOICE,
       dueDate: new Date(),
       plans: plans,
-    });    
+    });
     return await this.usersRepository.save(customer);
   }
 
