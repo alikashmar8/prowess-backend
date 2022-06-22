@@ -48,6 +48,11 @@ export class InvoicesService {
       .leftJoinAndSelect('invoice.collectedBy', 'collectedBy')
       .leftJoinAndSelect('invoice.plans', 'plan')
       .leftJoinAndSelect('invoice.items', 'items')
+      .leftJoinAndSelect('user.address', 'address')
+      .leftJoinAndSelect('address.parent', 'level2')
+      .leftJoinAndSelect('level2.parent', 'level3')
+      .leftJoinAndSelect('level3.parent', 'level4')
+      .leftJoinAndSelect('level4.parent', 'level5')      
       .where('user.company_id = :company_id', {
         company_id: currentUser.company_id,
       });
