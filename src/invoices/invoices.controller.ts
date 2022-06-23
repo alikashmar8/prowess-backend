@@ -126,7 +126,7 @@ export class InvoicesController {
     ]);
   }
 
-  @Roles(UserRoles.MANAGER, UserRoles.SUPERVISOR, UserRoles.COLLECTOR)
+  @Roles(UserRoles.ADMIN)
   @UseGuards(RolesGuard)
   @Put('forgive')
   async forgiveInvoices(@CurrentUser() user, @Body() body: CollectListDTO) {
