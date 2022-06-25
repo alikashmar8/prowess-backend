@@ -1,7 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
-  Injectable,
+  Injectable
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Response } from 'express';
@@ -9,7 +9,7 @@ import { createReadStream } from 'fs';
 import { CollectListDTO } from 'src/common/dtos/collect-list.dto';
 import {
   getInvoicePdf,
-  getInvoicesReportHtml,
+  getInvoicesReportHtml
 } from 'src/common/utils/reports-html';
 import { Item } from 'src/items/item.entity';
 import { Plan } from 'src/plans/plan.entity';
@@ -20,7 +20,7 @@ import * as XLSX from 'xlsx';
 import {
   getAddressesRelationsListWithUserKeyword,
   getAddressString,
-  getPlansTotal,
+  getPlansTotal
 } from '../common/utils/functions';
 import { CreateInvoiceDTO } from './dtos/create-invoice.dto';
 import { InvoiceTypes } from './enums/invoice-types.enum';
@@ -52,7 +52,7 @@ export class InvoicesService {
       .leftJoinAndSelect('address.parent', 'level2')
       .leftJoinAndSelect('level2.parent', 'level3')
       .leftJoinAndSelect('level3.parent', 'level4')
-      .leftJoinAndSelect('level4.parent', 'level5')      
+      .leftJoinAndSelect('level4.parent', 'level5')
       .where('user.company_id = :company_id', {
         company_id: currentUser.company_id,
       });
@@ -178,21 +178,39 @@ export class InvoicesService {
       relations: ['plans'],
     });
 
+    let date = new Date();
+    let year = date.getFullYear();
+    let month = date.getMonth();
+    var firstDay = new Date(year, month, 1);
+    var lastDay = new Date(year, month + 1, 0);
+
     users.forEach(async (user: User) => {
-      await this.invoicesRepository.save({
-        isFirstPayment: false,
-        isPaid: false,
-        dueDate: new Date(
-          new Date().getFullYear(),
-          new Date().getMonth(),
-          user.paymentDate.getDate(),
-        ),
-        plans: user.plans,
-        total: getPlansTotal(user.plans),
-        type: InvoiceTypes.PLANS_INVOICE,
-        user: user,
-        note: 'Monthly Auto Generated Invoice',
-      });
+      const thisMonthUserInvoice = await this.invoicesRepository
+        .createQueryBuilder('invoice')
+        .where('invoice.user_id = :user_id', { user_id: user.id })
+        .andWhere(
+          `invoice.dueDate
+        BETWEEN :begin
+        AND :end`,
+          { begin: firstDay, end: lastDay },
+        )
+        .getMany();
+      if (!thisMonthUserInvoice) {
+        await this.invoicesRepository.save({
+          isFirstPayment: false,
+          isPaid: false,
+          dueDate: new Date(
+            new Date().getFullYear(),
+            new Date().getMonth(),
+            user.paymentDate.getDate(),
+          ),
+          plans: user.plans,
+          total: getPlansTotal(user.plans),
+          type: InvoiceTypes.PLANS_INVOICE,
+          user: user,
+          note: 'Monthly Auto Generated Invoice',
+        });
+      }
     });
 
     return true;

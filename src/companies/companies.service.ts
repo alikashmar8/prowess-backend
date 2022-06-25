@@ -6,7 +6,10 @@ import {
   MANAGER_RENEW_AMOUNT,
   SUPERVISOR_RENEW_AMOUNT,
 } from 'src/common/constants';
-import { removeSpecialCharacters } from 'src/common/utils/functions';
+import {
+  getPlansTotal,
+  removeSpecialCharacters,
+} from 'src/common/utils/functions';
 import { InvoiceTypes } from 'src/invoices/enums/invoice-types.enum';
 import { InvoicesService } from 'src/invoices/invoices.service';
 import { Plan } from 'src/plans/plan.entity';
@@ -221,7 +224,6 @@ export class CompaniesService {
     }
 
     query = await query.skip(skip).take(take).getManyAndCount();
-    console.log(query);
     return {
       data: query[0],
       count: query[1],
@@ -254,11 +256,6 @@ export class CompaniesService {
         'Number of customers exceeded the limit, to increase limit please contact the administrator',
       );
 
-    if (
-      new Date(data.paymentDate) < new Date(new Date().setHours(0, 0, 0, 0))
-    ) {
-      throw new BadRequestException('Payment date cannot be in the past');
-    }
     let customer = this.usersRepository.create({ ...data, plans: [] });
     customer = await this.usersRepository.save(customer).catch((err) => {
       console.error(err);
@@ -283,6 +280,20 @@ export class CompaniesService {
       type: InvoiceTypes.PLANS_INVOICE,
       dueDate: new Date(),
       plans: plans,
+    });
+    await this.invoicesRepository.save({
+      isFirstPayment: false,
+      isPaid: false,
+      dueDate: new Date(
+        new Date().getFullYear(),
+        new Date().getMonth() + 1,
+        customer.paymentDate.getDate(),
+      ),
+      plans: plans,
+      total: getPlansTotal(plans),
+      type: InvoiceTypes.PLANS_INVOICE,
+      user: customer,
+      note: 'Monthly Auto Generated Invoice',
     });
     return await this.usersRepository.save(customer);
   }
