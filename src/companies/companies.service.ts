@@ -137,6 +137,10 @@ export class CompaniesService {
     let query: any = await this.usersRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.address', 'address')
+      .leftJoinAndSelect('address.parent', 'level2')
+      .leftJoinAndSelect('level2.parent', 'level3')
+      .leftJoinAndSelect('level3.parent', 'level4')
+      .leftJoinAndSelect('level4.parent', 'level5')
       .where(`user.company_id = ${company_id}`)
       .andWhere(`user.role = 'CUSTOMER'`);
     if (level1Add) {
